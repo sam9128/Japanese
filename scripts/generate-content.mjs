@@ -2,8 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { Converter } from "opencc-js";
 import { grammarExamples } from "./source/grammar-examples.mjs";
+import { assessmentScenarios } from "./source/assessment-scenarios.mjs";
 
 const root = path.resolve(import.meta.dirname, "..");
+const dryRun = process.argv.includes("--dry-run");
+const printSamples = process.argv.includes("--print-samples");
+const printGrammarMap = process.argv.includes("--print-grammar-map");
 const sourceRoot = path.resolve(root, "..", "tmp", "language-learning-decks", "japanese");
 const outRoot = path.join(root, "public", "content", "periods");
 const periods = ["115-07", "115-08", "115-09", "115-10", "115-11", "115-12", "116-01", "116-02", "116-03", "116-04", "116-05", "116-06"];
@@ -129,6 +133,7 @@ function loadWords() {
     category: "vocab",
     term: item.word,
     reading: /[\u3040-\u30ff]/.test(item.word) && !/[\u4e00-\u9faf]/.test(item.word) ? item.word : romajiToKana(item.romanization),
+    readingQuizEligible: !/[āēīōū]/i.test(item.romanization||"") && !/(zu|ji)/i.test(item.romanization||"") && item.word.length>=2,
     meaningZh,
     meaningEn: item.english_translation,
     usageZh: usageZh(item, meaningZh),
@@ -177,75 +182,196 @@ function makeGrammar() {
   }));
 }
 
-const themes = ["駅の乗り換え", "コンビニ", "学校行事", "アルバイトの予定", "天気予報", "健康な生活", "旅行の計画", "部屋探し", "オンラインショッピング", "文化祭", "図書館", "職場での連絡", "環境保護"];
-function makeReading(index) {
-  const theme = themes[index % themes.length];
-  return { id:`reading-${String(index+1).padStart(2,"0")}`, level:index < 32 ? "N3":"N2", category:"reading", term:`閱讀 ${index+1}｜${theme}`, reading:"精讀與摘要", meaningZh:"先計時閱讀，再完成摘要與理解題。", audioText:"", unlockPeriod:periods[Math.min(11, Math.floor(index/5))], tags:[theme], sourceRefs:["self-authored"], license:"CC BY 4.0 — 本計畫自編", estimatedMinutes:8+(index%5), difficulty:1+(index%5), content:`今日は「${theme}」について考えます。予定を確認してから、必要なものを準備しました。最初は少し難しいと思いましたが、周りの人に相談すると、よい方法が見つかりました。\n\n大切なのは、分からないことをそのままにしないことです。小さな行動を続ければ、次に同じ場面が来たとき、落ち着いて対応できます。`, questions:[{prompt:"文章中，作者遇到困難後做了什麼？",options:["直接放棄","向身邊的人請教","改天再說","什麼也沒做"],answer:1,explanation:"文中提到「周りの人に相談すると」。"},{prompt:"文章最想傳達什麼？",options:["準備不重要","只靠運氣","持續小行動能帶來改變","不能問別人"],answer:2,explanation:"末段強調小さな行動を続ける。"}] };
-}
-function makeListening(index) {
-  const theme = themes[index % themes.length];
-  const lines = [`すみません、${theme}について確認したいんですが。`,"はい、どのようなことでしょうか。","時間と場所が変わったと聞きました。","時間は午後三時、場所は二階の会議室です。","分かりました。少し早めに行きます。"];
-  return { id:`listening-${String(index+1).padStart(3,"0")}`, level:index < 64 ? "N3":"N2", category:"listening", term:`聽力 ${index+1}｜${theme}`, reading:"逐句聽解", meaningZh:"先盲聽，再逐句確認聽力稿。", audioText:lines.join(" "), unlockPeriod:periods[Math.min(11, Math.floor(index/9))], tags:[theme], sourceRefs:["self-authored"], license:"CC BY 4.0 — 本計畫自編", estimatedMinutes:6, difficulty:1+(index%5), lines, questions:[{prompt:"新的時間與地點是什麼？",options:["下午三點、二樓會議室","下午兩點、一樓大廳","上午三點、教室","沒有改變"],answer:0,explanation:"第四句明確說明時間與地點。"}] };
-}
-
 function rotateOptions(correct, distractors, seed) {
-  const options = [correct, ...distractors.filter((item) => item !== correct)].slice(0, 4);
+  const options = [...new Set([correct, ...distractors.filter((item) => item !== correct)])].slice(0, 4);
+  if (options.length !== 4) throw new Error(`選項不足：${correct}`);
   const shift = seed % options.length;
   const rotated = [...options.slice(shift), ...options.slice(0, shift)];
   return { options:rotated, answer:rotated.indexOf(correct) };
 }
 
+function scenarioValues(index, key) {
+  const correct=assessmentScenarios[index][key];
+  const values=[...new Set(assessmentScenarios.map((scenario)=>scenario[key]))].filter((value)=>value!==correct);
+  const shift=index%values.length;
+  return [...values.slice(shift),...values.slice(0,shift)];
+}
+
+function makeQuestion(prompt, correct, distractors, seed, explanation, evidence = correct) {
+  return { prompt, ...rotateOptions(correct, distractors, seed), explanation, evidence };
+}
+
+function makeReading(index) {
+  const scenarioIndex = index % assessmentScenarios.length;
+  const variant = Math.floor(index / assessmentScenarios.length);
+  const s = assessmentScenarios[scenarioIndex];
+  let content;
+  let questions;
+  if (variant === 0) {
+    content = `【${s.event}についてのお知らせ】\n${s.reason}ため、${s.event}は${s.oldTime}・${s.oldPlace}から、${s.newTime}・${s.newPlace}に変更します。参加する人は${s.item}を持ち、開始の十分前までに集まってください。質問がある場合は、${s.contact}へ連絡してください。`;
+    questions = [
+      makeQuestion("参加する人は、いつ、どこへ行きますか。", `${s.newTime}に${s.newPlace}へ行く。`, [`${s.oldTime}に${s.oldPlace}へ行く。`,`${s.newTime}に${s.oldPlace}へ行く。`,`${s.oldTime}に${s.newPlace}へ行く。`], index, `文章指出變更後應在「${s.newTime}」前往「${s.newPlace}」。`, `${s.newTime}・${s.newPlace}`),
+      makeQuestion("参加する人が持っていくものは何ですか。", s.item, scenarioValues(scenarioIndex,"item"), index+1, `通知要求參加者攜帶「${s.item}」。`)
+    ];
+  } else if (variant === 1) {
+    content = `件名：${s.event}の準備について\n${s.actor}です。${s.event}を予定どおり進めるため、「${s.action}」という準備を${s.deadline}までに終えてください。終わった人は${s.contact}へ連絡してください。当日は${s.item}も忘れずに持ってきてください。${s.reason}ため、直前にもう一度予定を確認する必要があります。`;
+    questions = [
+      makeQuestion("参加する人が最初にしなければならないことは何ですか。", `${s.action}。`, scenarioValues(scenarioIndex,"action").map(value=>`${value}。`), index, `郵件要求先「${s.action}」。`, s.action),
+      makeQuestion("準備が終わった後、どうしますか。", `${s.contact}へ連絡する。`, scenarioValues(scenarioIndex,"contact").map(value=>`${value}へ連絡する。`), index+1, `準備完成後要聯絡「${s.contact}」。`, s.contact)
+    ];
+  } else if (variant === 2) {
+    content = `私は、${s.event}をうまく進めるには、「${s.action}」という準備を事前に行うことが大切だと思います。以前は準備を当日まで延ばしてしまい、必要な情報を確認できませんでした。そこで、今回は早めに準備を始めました。その結果、${s.result}。${s.reason}場合でも、前もって確認しておけば落ち着いて対応できます。`;
+    questions = [
+      makeQuestion("早めに準備した結果、どうなりましたか。", `${s.result}。`, scenarioValues(scenarioIndex,"result").map(value=>`${value}。`), index, `作者提到提早準備後「${s.result}」。`),
+      makeQuestion("筆者が最も伝えたいことは何ですか。", `「${s.action}」という準備を事前に行うことが大切だ。`, [`準備は当日になってから始めればよい。`,`予定が変わったときは何もしないほうがよい。`,`必要な情報はほかの人だけに確認してもらえばよい。`], index+1, `作者的主張是事前「${s.action}」很重要。`, s.action)
+    ];
+  } else {
+    content = `【${s.event} 参加案内】\n申込：${s.deadline}までに${s.contact}へ連絡してください。\n集合：${s.newTime}、${s.newPlace}\n持ち物：${s.item}\n準備：参加前に「${s.action}」という準備を済ませること。\n注意：${s.reason}場合は、集合時刻や場所を変更することがあります。変更は申込者にメールで知らせます。`;
+    questions = [
+      makeQuestion("参加を申し込むには、どうすればいいですか。", `${s.deadline}までに${s.contact}へ連絡する。`, [`${s.newTime}に${s.contact}へ行く。`,`${s.deadline}までに${s.newPlace}へ行く。`,`${s.oldTime}にメールを待つ。`], index, `報名方式是在「${s.deadline}」前聯絡「${s.contact}」。`, s.deadline),
+      makeQuestion("案内の内容と合っているものはどれですか。", `参加する前に「${s.action}」という準備を済ませる必要がある。`, [`持ち物は何も必要ない。`,`変更があっても連絡は来ない。`,`集合場所は必ず${s.oldPlace}である。`], index+1, `指南明確要求參加前先「${s.action}」。`, s.action)
+    ];
+  }
+  const id=`reading-${String(index+1).padStart(2,"0")}`;
+  questions=questions.map((question,questionIndex)=>({...question,id:`${id}-q${questionIndex+1}`}));
+  return { id, level:index < 32 ? "N3":"N2", category:"reading", term:`閱讀 ${index+1}｜${s.theme}`, reading:"精讀與摘要", meaningZh:"先計時閱讀，再完成摘要與理解題。", audioText:"", unlockPeriod:periods[Math.min(11, Math.floor(index/5))], tags:[s.theme], sourceRefs:["self-authored"], license:"CC BY 4.0 — 本計畫自編", estimatedMinutes:8+(index%5), difficulty:1+(index%5), content, questions };
+}
+
+function makeListening(index) {
+  const scenarioIndex = index % assessmentScenarios.length;
+  const variant = Math.floor(index / assessmentScenarios.length);
+  const s = assessmentScenarios[scenarioIndex];
+  let lines;
+  let question;
+  if (variant === 0) {
+    lines = [`女：${s.event}は${s.oldTime}に${s.oldPlace}で行う予定でしたね。`,`男：はい。でも、${s.reason}ため、予定が変わりました。`,`女：新しい予定を教えてください。`,`男：${s.newTime}に${s.newPlace}へ来てください。`,`女：分かりました。間違えないようにします。`];
+    question = makeQuestion("新しい時間と場所はどれですか。", `${s.newTime}・${s.newPlace}`, [`${s.oldTime}・${s.oldPlace}`,`${s.newTime}・${s.oldPlace}`,`${s.oldTime}・${s.newPlace}`], index, `對話確認新的時間與地點是「${s.newTime}・${s.newPlace}」。`, s.newTime);
+  } else if (variant === 1) {
+    lines = [`女：${s.event}の準備は、何から始めればいいですか。`,`男：まず、「${s.action}」という準備をしてください。`,`女：終わったら、どうしますか。`,`男：${s.contact}へ連絡してください。そのあと、${s.item}を用意しましょう。`,`女：はい、順番に進めます。`];
+    question = makeQuestion("女の人は、まず何をしますか。", `${s.action}。`, scenarioValues(scenarioIndex,"action").map(value=>`${value}。`), index, `男子首先要求「${s.action}」。`, s.action);
+  } else if (variant === 2) {
+    lines = [`男：どうして${s.event}の予定が変わったんですか。`,`女：${s.reason}からです。`,`男：中止ではないんですね。`,`女：はい。新しい予定はメールで知らせます。`,`男：分かりました。メールを確認します。`];
+    question = makeQuestion("予定が変わった理由は何ですか。", `${s.reason}から。`, scenarioValues(scenarioIndex,"reason").map(value=>`${value}から。`), index, `女子說明變更原因是「${s.reason}」。`, s.reason);
+  } else if (variant === 3) {
+    lines = [`女：${s.event}には何を持っていけばいいですか。`,`男：${s.item}を持ってきてください。`,`女：ほかにも必要ですか。`,`男：いいえ、それだけで大丈夫です。`,`女：では、忘れないように準備します。`];
+    question = makeQuestion("女の人は何を持っていきますか。", s.item, scenarioValues(scenarioIndex,"item"), index, `女子需要攜帶「${s.item}」。`);
+  } else if (variant === 4) {
+    lines = [`男：${s.event}の場所ですが、${s.oldPlace}は使えないそうです。`,`女：では、${s.newPlace}はどうですか。`,`男：そこなら全員が集まりやすいですね。`,`女：では、その場所に決めて、みんなに知らせます。`,`男：お願いします。`];
+    question = makeQuestion("二人は、どこで行うことにしましたか。", s.newPlace, [s.oldPlace,...scenarioValues(scenarioIndex,"newPlace").slice(0,2)], index, `兩人最後決定在「${s.newPlace}」進行。`);
+  } else if (variant === 5) {
+    lines = [`女：${s.action}のは、いつまでですか。`,`男：${s.deadline}までです。`,`女：明日でも間に合いますか。`,`男：はい。ただし、終わったらすぐ${s.contact}へ知らせてください。`,`女：分かりました。`];
+    question = makeQuestion("女の人は、いつまでに準備しますか。", s.deadline, scenarioValues(scenarioIndex,"deadline"), index, `期限是「${s.deadline}」。`);
+  } else if (variant === 6) {
+    lines = [`男：すみません、${s.event}の前に、「${s.action}」という準備をお願いできますか。`,`女：はい。${s.deadline}まででいいですか。`,`男：お願いします。終わったら私にメールしてください。`,`女：分かりました。今日から始めます。`,`男：よろしくお願いします。`];
+    question = makeQuestion("女の人は、このあと何をしますか。", `${s.action}。`, scenarioValues(scenarioIndex,"action").map(value=>`${value}。`), index, `男子請女子接著「${s.action}」。`, s.action);
+  } else {
+    lines = [`女：今回の${s.event}は、前より順調でしたね。`,`男：早い段階で「${s.action}」という準備をしたからだと思います。`,`女：その結果、どうなりましたか。`,`男：${s.result}。`,`女：次回も同じ方法で準備しましょう。`];
+    question = makeQuestion("早めに準備した結果、どうなりましたか。", `${s.result}。`, scenarioValues(scenarioIndex,"result").map(value=>`${value}。`), index, `對話指出結果是「${s.result}」。`);
+  }
+  const id=`listening-${String(index+1).padStart(3,"0")}`;
+  return { id, level:index < 64 ? "N3":"N2", category:"listening", term:`聽力 ${index+1}｜${s.theme}`, reading:"逐句聽解", meaningZh:"先盲聽，再逐句確認聽力稿。", audioText:lines.join(" "), unlockPeriod:periods[Math.min(11, Math.floor(index/9))], tags:[s.theme], sourceRefs:["self-authored"], license:"CC BY 4.0 — 本計畫自編", estimatedMinutes:6, difficulty:1+(index%5), lines, questions:[{...question,id:`${id}-q1`}] };
+}
+
+const grammarFunctions = [
+  "条件や仮定を表している", "目的を表している", "原因や理由を表している", "願望や祈りを表している",
+  "予想と異なる結果や対比を表している", "推量や伝聞を表している", "時間や動作の前後関係を表している",
+  "範囲の限定や強調を表している", "決定・義務・許可を表している", "状態の変化や動作の進行を表している",
+  "話題・立場・対象との関係を表している", "程度や比較を表している", "気持ちや評価を強く表している", "説明・引用・言い換えを表している",
+  "経験・習慣・一般的な傾向を表している", "否定・不可能・部分否定を表している", "情報の根拠や引用を表している",
+  "試み・授受・依頼を表している", "結果・きっかけ・判断の根拠を表している", "例示や話題の提示を表している",
+  "追加・並行・変化の連動を表している", "自然に起こる強い感情や衝動を表している"
+];
+
 function grammarFunctionJa(term) {
-  if (/(ば|たら|なら|としたら|ないことには|限り)/.test(term)) return "条件や仮定を表している";
-  if (/(ために|ように)/.test(term)) return "目的や理由を表している";
-  if (/(ものの|にもかかわらず|ながらも|くせに|わりに|反面)/.test(term)) return "予想と異なる結果や対比を表している";
-  if (/(ようだ|みたいだ|らしい|そうだ|かもしれない|に違いない)/.test(term)) return "推量や伝聞を表している";
-  if (/(うちに|間|ところ|最中|際|以来|たび)/.test(term)) return "時間や動作の前後関係を表している";
-  if (/(だけ|しか|限って|のみならず|さえ|こそ)/.test(term)) return "範囲の限定や強調を表している";
-  return "動作・状態と話し手の判断の関係を表している";
+  if (/(といっても|にしては|といったら)/.test(term)) return "予想と異なる結果や対比を表している";
+  if (/(というものではない)/.test(term)) return "否定・不可能・部分否定を表している";
+  if (/(に越したことはない)/.test(term)) return "程度や比較を表している";
+  if (/(ことには|〜限り$|〜ては$)/.test(term)) return "条件や仮定を表している";
+  if (/(〜つつ$)/.test(term)) return "追加・並行・変化の連動を表している";
+  if (/(〜上で$)/.test(term)) return "時間や動作の前後関係を表している";
+  if (/(〜ことなく$)/.test(term)) return "否定・不可能・部分否定を表している";
+  if (/(〜ものだから$)/.test(term)) return "原因や理由を表している";
+  if (/(〜次第だ$|にほかならない)/.test(term)) return "結果・きっかけ・判断の根拠を表している";
+  if (/(ということだ|とのことだ|と言われている|によると|によれば)/.test(term)) return "情報の根拠や引用を表している";
+  if (/(ずにはいられない|ないではいられない)/.test(term)) return "自然に起こる強い感情や衝動を表している";
+  if (/(かと思ったら|かと思うと|や否や|なり$|そばから|か.*ないかのうちに)/.test(term)) return "時間や動作の前後関係を表している";
+  if (/(ことになっている|ことにしている|ようにしている|ものではない|ことだ$)/.test(term)) return "決定・義務・許可を表している";
+  if (/(わけではない|わけがない|はずがない|ことはない|ないことはない|ないわけではない|というものではない|ものか|どころではない|どころではなく|ないで済む|ずに済む)/.test(term)) return "否定・不可能・部分否定を表している";
+  if (/(ことがある|ものだ$|てばかりいる)/.test(term)) return "経験・習慣・一般的な傾向を表している";
+  if (/(てもらう|てくれる|ていただく|てくださる|させてもらう|させていただく|てみる|ようとする)/.test(term)) return "試み・授受・依頼を表している";
+  if (/(に加えて|に沿って|につれて|にしたがって|にともなって|とともに|上に)/.test(term)) return "追加・並行・変化の連動を表している";
+  if (/(をきっかけに|を契機に|た末に|あげく|結果|からして|からすると|から見ると|から言うと)/.test(term)) return "結果・きっかけ・判断の根拠を表している";
+  if (/(なんか|など|なんて|とは$|という$|といった$|というと|といえば|というより)/.test(term)) return "例示や話題の提示を表している";
+  if (/(ために（原因）|につき|ことだから|ことから)/.test(term)) return "原因や理由を表している";
+  if (/(ために（目的）|ように（目的）)/.test(term)) return "目的を表している";
+  if (/(ように（祈願）|どんなに.*ことか|ことか)/.test(term)) return "願望や祈りを表している";
+  if (/(てからでないと|ば$|たら$|なら$|としたら|とすれば|としても|にしても|にしろ|にせよ|ないことには|ない限り|さえ.*ば|ものなら|たとえ|次第で|次第では|上は|以上|からには|ても$|〜と$|にしたって)/.test(term)) return "条件や仮定を表している";
+  if (/(ものの|にもかかわらず|ながらも|くせに|わりに|に反して|とはいえ|からといって|どころか|反面|一方で|にしては|といっても|ものを)/.test(term)) return "予想と異なる結果や対比を表している";
+  if (/(ようだ|みたいだ|らしい|そうだ|かもしれない|に違いない|に決まっている|おそれがある|可能性|とみえる|かのようだ|はずだ|に相違ない|かねない)/.test(term)) return "推量や伝聞を表している";
+  if (/(うちに|間に|間$|ところ|最中|途中|際に|にあたって|に先立って|て以来|てからというもの|たび|次第$|ごとに|おきに|たばかり)/.test(term)) return "時間や動作の前後関係を表している";
+  if (/(だけ|しか|に限|のみならず|ばかりでなく|はもちろん|さえ|こそ|を問わず|にかかわらず|にすぎない|限りでは)/.test(term)) return "範囲の限定や強調を表している";
+  if (/(ことにする|ことになる|ようにする|べき|わけにはいかない|ざるを得ない|てはいけない|てもかまわない|かねる)/.test(term)) return "決定・義務・許可を表している";
+  if (/(ていく|てくる|つつある|一方だ|始める|続ける|終わる|きる|きれない|ぬく|通す|込む|出す|ておく|てある|てしまう|ようになる|ばかりだ|かけ)/.test(term)) return "状態の変化や動作の進行を表している";
+  if (/(について|に関して|に対して|にとって|として|において|をめぐって|に基づいて|に応じて|によって|を通じて|を通して|にかわって|に代わり|にこたえて)/.test(term)) return "話題・立場・対象との関係を表している";
+  if (/(ほど|くらい|に比べて|ば.*ほど|なら.*ほど|だけあって|だけに|に越したことはない)/.test(term)) return "程度や比較を表している";
+  if (/(てたまらない|てならない|てしょうがない|て仕方がない|ことに|げ|気味|がち|っぽい|といったら)/.test(term)) return "気持ちや評価を強く表している";
+  return "説明・引用・言い換えを表している";
+}
+
+const assessmentUsage = {vocabulary:new Set(),grammar:new Set(),reading:new Set(),listening:new Set()};
+
+function orderedLevelPool(items, level, maxPeriod) {
+  const unlocked = items.filter((item) => periods.indexOf(item.unlockPeriod) <= maxPeriod);
+  const exact=unlocked.filter((item)=>item.level===level);
+  return exact.length ? exact : unlocked.filter((item)=>item.level!==level);
+}
+
+function takeUnused(items, used, seed, key = (item)=>item.id, label = "題庫") {
+  for (let offset=0; offset<items.length; offset+=1) {
+    const item=items[(seed+offset)%items.length];
+    const itemKey=key(item);
+    if (!used.has(itemKey)) { used.add(itemKey); return item; }
+  }
+  throw new Error(`${label}不足，無法產生不重複題目（可用 ${items.length}，已使用 ${used.size}）`);
 }
 
 function makeExamQuestions(id, level, period, questionCount, catalog) {
   const maxPeriod = periods.indexOf(period);
-  const unlocked = (items) => items.filter((item) => periods.indexOf(item.unlockPeriod) <= maxPeriod);
-  const vocabPool = unlocked(catalog.vocabulary).filter((item) => level === "N2" || item.level === "N3");
-  const kanjiPool = vocabPool.filter((item) => /[\u3400-\u9fff]/.test(item.term));
-  const grammarPool = unlocked(catalog.grammar).filter((item) => level === "N2" || item.level === "N3");
-  const readingPool = unlocked(catalog.reading).filter((item) => level === "N2" || item.level === "N3");
-  const listeningPool = unlocked(catalog.listening).filter((item) => level === "N2" || item.level === "N3");
+  const kanjiPool = orderedLevelPool(catalog.vocabulary,level,maxPeriod).filter((item) => /[\u3400-\u9fff]/.test(item.term)&&item.reading&&item.reading!==item.term&&item.readingQuizEligible);
+  const grammarPool = orderedLevelPool(catalog.grammar,level,maxPeriod);
+  const readingPool = orderedLevelPool(catalog.reading,level,maxPeriod).flatMap((item)=>item.questions.map((question,questionIndex)=>({item,question,questionIndex,id:`${item.id}-q${questionIndex+1}`})));
+  const listeningPool = orderedLevelPool(catalog.listening,level,maxPeriod).map((item)=>({item,question:item.questions[0],id:`${item.id}-q1`}));
+  const used=assessmentUsage;
   const seedBase = [...id].reduce((sum, char) => sum + char.charCodeAt(0), 0);
   return Array.from({length:questionCount}, (_, index) => {
     const seed = seedBase * 17 + index * 13;
-    const type = index % 5;
+    const type = index % 6;
     if (type === 0) {
-      const item = readingPool[seed % readingPool.length];
-      const lessonTitle = item.term.replace(/^閱讀/, "読解");
-      const choice = rotateOptions("分からないことは周りの人に相談することが大切だ。", ["難しいことはすぐにあきらめたほうがよい。","準備をしなくても運がよければ問題はない。","一人で何でも決め、他の人には聞かないほうがよい。"], seed);
-      return { id:`${id}-q${index+1}`, section:"読解", type:"内容理解", instruction:"次の文章を読んで、質問に答えなさい。", passage:item.content, prompt:`文章の内容と合っているものはどれですか。（${lessonTitle}）`, ...choice, explanationZh:"文章指出遇到不懂的事情時應向身邊的人請教，持續小行動能讓下次應對得更好。" };
+      const item=takeUnused(kanjiPool,used.vocabulary,seed,undefined,`${id} 漢字読み`);
+      const distractors=kanjiPool.filter((candidate)=>candidate.id!==item.id&&candidate.reading!==item.reading).slice(seed%Math.max(1,kanjiPool.length-3)).concat(kanjiPool).map((candidate)=>candidate.reading);
+      return { id:`${id}-q${index+1}`, section:"言語知識", type:"漢字読み", instruction:"「　」の言葉の読み方として最もよいものを一つ選びなさい。", prompt:`「${item.term}」の読み方はどれですか。`, ...rotateOptions(item.reading,distractors,seed), explanationZh:`「${item.term}」讀作「${item.reading}」，中文意思是「${item.meaningZh}」。`, sourceCardId:item.id, logic:"kanji-reading" };
     }
     if (type === 1) {
-      const item = vocabPool[seed % vocabPool.length];
-      const others = [1,2,3].map((offset) => vocabPool[(seed + offset * 19) % vocabPool.length].term);
-      const sentence = item.examples[0].ja.replaceAll(item.term, "（　　）");
-      const choice = rotateOptions(item.term, others, seed);
-      return { id:`${id}-q${index+1}`, section:"言語知識", type:"文脈規定", instruction:"（　　）に入る最もよいものを一つ選びなさい。", prompt:sentence, ...choice, explanationZh:`正確答案是「${item.term}」（${item.reading}），中文意思是「${item.meaningZh}」。` };
+      const item=takeUnused(kanjiPool,used.vocabulary,seed,undefined,`${id} 表記`);
+      const distractors=kanjiPool.filter((candidate)=>candidate.id!==item.id&&candidate.reading!==item.reading).slice(seed%Math.max(1,kanjiPool.length-3)).concat(kanjiPool).map((candidate)=>candidate.term);
+      return { id:`${id}-q${index+1}`, section:"言語知識", type:"表記", instruction:"ひらがなで示した言葉の表記として最もよいものを一つ選びなさい。", prompt:`「${item.reading}」と読む言葉はどれですか。`, ...rotateOptions(item.term,distractors,seed), explanationZh:`「${item.reading}」的正確表記是「${item.term}」，中文意思是「${item.meaningZh}」。`, sourceCardId:item.id, logic:"orthography" };
     }
     if (type === 2) {
-      const item = kanjiPool[seed % kanjiPool.length];
-      const others = [1,2,3].map((offset) => kanjiPool[(seed + offset * 23) % kanjiPool.length].reading);
-      const choice = rotateOptions(item.reading, others, seed);
-      return { id:`${id}-q${index+1}`, section:"言語知識", type:"漢字読み", instruction:"＿＿＿の言葉の読み方として最もよいものを一つ選びなさい。", prompt:`「${item.term}」の読み方はどれですか。`, ...choice, explanationZh:`「${item.term}」讀作「${item.reading}」，中文意思是「${item.meaningZh}」。` };
+      const item=takeUnused(grammarPool,used.grammar,seed,undefined,`${id} 文法`);
+      const correct=grammarFunctionJa(item.term);
+      return { id:`${id}-q${index+1}`, section:"文法", type:"文法形式", instruction:"次の文で使われている文法の働きとして最もよいものを一つ選びなさい。", passage:item.examples[0].ja, prompt:`「${item.term}」は、この文でどのような意味を表していますか。`, ...rotateOptions(correct,grammarFunctions.filter((value)=>value!==correct).slice(seed%10).concat(grammarFunctions),seed), explanationZh:`本題句型是「${item.term}」，在例句中用來表示「${correct}」。${item.meaningZh} 例句：${item.examples[0].ja}`, sourceCardId:item.id, logic:"grammar-function" };
     }
     if (type === 3) {
-      const item = grammarPool[seed % grammarPool.length];
-      const correct = grammarFunctionJa(item.term);
-      const choice = rotateOptions(correct, ["人や物の数を表している","過去の事実だけを列挙している","相手への命令だけを表している"], seed);
-      return { id:`${id}-q${index+1}`, section:"文法", type:"文法形式", instruction:"次の文の文法の働きとして最もよいものを一つ選びなさい。", passage:item.examples[0].ja, prompt:`「${item.term}」は、この文でどのような意味を表していますか。`, ...choice, explanationZh:`本題句型是「${item.term}」。${item.meaningZh} 例句：${item.examples[0].ja}` };
+      const entry=takeUnused(readingPool,used.reading,seed,undefined,`${id} 読解`);
+      return { id:`${id}-q${index+1}`, section:"読解", type:"内容理解", instruction:"次の文章を読んで、質問に答えなさい。", passage:entry.item.content, prompt:entry.question.prompt, options:entry.question.options, answer:entry.question.answer, explanationZh:entry.question.explanation, sourceQuestionId:entry.question.id, logic:"reading-source" };
     }
-    const item = listeningPool[seed % listeningPool.length];
-    const lessonTitle = item.term.replace(/^聽力/, "聴解");
-    const choice = rotateOptions("時間は午後三時で、場所は二階の会議室だ。", ["時間は午後二時で、場所は一階のロビーだ。","時間も場所もまだ決まっていない。","会議は中止になり、今日は行かなくてもよい。"], seed);
-    return { id:`${id}-q${index+1}`, section:"聴解", type:"ポイント理解", instruction:"音声を聞いて、内容と合っているものを一つ選びなさい。", prompt:`${lessonTitle}について、正しいものはどれですか。`, audioText:item.audioText, ...choice, explanationZh:"對話中明確說明新的時間是下午三點，地點是二樓會議室。作答前可重播一次確認關鍵資訊。" };
+    if (type === 4) {
+      const entry=takeUnused(listeningPool,used.listening,seed,undefined,`${id} 聴解`);
+      return { id:`${id}-q${index+1}`, section:"聴解", type:"ポイント理解", instruction:"音声を聞いて、質問に答えなさい。", prompt:entry.question.prompt, audioText:entry.item.audioText, options:entry.question.options, answer:entry.question.answer, explanationZh:entry.question.explanation, sourceQuestionId:entry.question.id, logic:"listening-source" };
+    }
+    const item=takeUnused(grammarPool,used.grammar,seed,undefined,`${id} 文法`);
+    const correct=grammarFunctionJa(item.term);
+    return { id:`${id}-q${index+1}`, section:"文法", type:"文法形式", instruction:"次の文で使われている文法の働きとして最もよいものを一つ選びなさい。", passage:item.examples[0].ja, prompt:`「${item.term}」は、この文でどのような意味を表していますか。`, ...rotateOptions(correct,grammarFunctions.filter((value)=>value!==correct).slice((seed+3)%10).concat(grammarFunctions),seed), explanationZh:`本題句型是「${item.term}」，在例句中用來表示「${correct}」。${item.meaningZh} 例句：${item.examples[0].ja}`, sourceCardId:item.id, logic:"grammar-function" };
   });
 }
 
@@ -264,11 +390,94 @@ const assessments = [
   ...Array.from({length:2},(_,i)=>makeAssessment(`mock-n2-${i+1}`,`N2 自編模考 ${i+1}`,"N2","116-06",105,35,"mock",catalog))
 ];
 
-fs.mkdirSync(outRoot,{recursive:true});
-for (const period of periods) {
-  const payload = { period, vocabulary:vocabulary.filter(x=>x.unlockPeriod===period), grammar:grammar.filter(x=>x.unlockPeriod===period), reading:reading.filter(x=>x.unlockPeriod===period), listening:listening.filter(x=>x.unlockPeriod===period), assessments:assessments.filter(x=>x.unlockPeriod===period) };
-  fs.writeFileSync(path.join(outRoot,`${period}.json`),JSON.stringify(payload));
+function auditGeneratedQuestions() {
+  const hasJapanese=(value)=>/[\u3040-\u30ff\u3400-\u9fff]/.test(value||"");
+  const hasChineseMarker=(value)=>/[這裡還讓應該嗎個們]|下午|上午|二樓|選項|答案|中文|直接放棄|身邊的人/.test(value||"");
+  const hasChineseExplanation=(value)=>/指出|要求|需要|首先|變更|聯絡|作者|期限|報名|指南|正確|讀作|中文|用來|對話|郵件|準備|男子|女子|通知|攜帶|兩人|女子/.test(value||"");
+  const assert=(condition,message)=>{if(!condition)throw new Error(`題庫稽核失敗：${message}`)};
+  const readingContents=new Set(reading.map((item)=>item.content));
+  const listeningScripts=new Set(listening.map((item)=>item.audioText));
+  const awkwardPatterns=[/するください/,/するもらえ/,/事前に前日まで/,/までに前日まで/,/早めに前日まで/];
+  assert(readingContents.size===52,`閱讀內容僅 ${readingContents.size}/52 篇不重複`);
+  assert(listeningScripts.size===104,`聽力稿僅 ${listeningScripts.size}/104 組不重複`);
+
+  const sourceQuestions=new Map();
+  for(const item of [...reading,...listening]){
+    const sourceText=item.category==="reading"?item.content:item.audioText;
+    assert(!awkwardPatterns.some((pattern)=>pattern.test(sourceText)),`${item.id} 含不自然的日文接續`);
+    assert(item.questions.length===(item.category==="reading"?2:1),`${item.id} 題數不正確`);
+    if(item.category==="listening")assert(item.lines.length===5&&item.audioText===item.lines.join(" "),`${item.id} 聽力稿與逐句內容不一致`);
+    for(const question of item.questions){
+      assert(!sourceQuestions.has(question.id),`來源題 ID 重複：${question.id}`);
+      assert(hasJapanese(question.prompt),`${question.id} 題幹不是日文`);
+      assert(question.options.length===4&&new Set(question.options).size===4,`${question.id} 選項不是四個唯一值`);
+      assert(question.options.every((option)=>hasJapanese(option)&&!hasChineseMarker(option)),`${question.id} 含非日文選項`);
+      assert(Number.isInteger(question.answer)&&question.answer>=0&&question.answer<4,`${question.id} 答案索引錯誤`);
+      assert(sourceText.includes(question.evidence),`${question.id} 的答案證據「${question.evidence}」不在素材中`);
+      assert(hasChineseExplanation(question.explanation),`${question.id} 缺少中文解析`);
+      sourceQuestions.set(question.id,{item,question});
+    }
+  }
+
+  const cards=new Map([...vocabulary,...grammar].map((item)=>[item.id,item]));
+  const examQuestionIds=new Set();
+  const examSignatures=new Set();
+  const usedSources=new Set();
+  const requiredTypes=["漢字読み","表記","文法形式","内容理解","ポイント理解"];
+  let examQuestionCount=0;
+  for(const assessment of assessments){
+    assert(assessment.questions.length===assessment.questionCount,`${assessment.id} 題數不符`);
+    assert(requiredTypes.every((type)=>assessment.questions.some((question)=>question.type===type)),`${assessment.id} 題型有缺漏`);
+    for(const question of assessment.questions){
+      examQuestionCount+=1;
+      assert(!examQuestionIds.has(question.id),`考題 ID 重複：${question.id}`); examQuestionIds.add(question.id);
+      const signature=`${question.passage||""}|${question.audioText||""}|${question.prompt}`;
+      assert(!examSignatures.has(signature),`考題內容重複：${question.id}`); examSignatures.add(signature);
+      assert(hasJapanese(question.instruction)&&hasJapanese(question.prompt),`${question.id} 題目說明或題幹不是日文`);
+      assert(question.options.length===4&&new Set(question.options).size===4,`${question.id} 選項重複或缺漏`);
+      assert(question.options.every((option)=>hasJapanese(option)&&!hasChineseMarker(option)),`${question.id} 含非日文選項`);
+      assert(Number.isInteger(question.answer)&&question.answer>=0&&question.answer<4,`${question.id} 答案索引錯誤`);
+      assert(hasChineseExplanation(question.explanationZh),`${question.id} 缺少作答後中文解析`);
+      const sourceId=question.sourceQuestionId||question.sourceCardId;
+      assert(sourceId&&!usedSources.has(sourceId),`${question.id} 重複使用來源 ${sourceId}`); usedSources.add(sourceId);
+      if(question.sourceQuestionId){
+        const source=sourceQuestions.get(question.sourceQuestionId);
+        assert(source,`${question.id} 找不到來源題 ${question.sourceQuestionId}`);
+        assert(question.prompt===source.question.prompt&&JSON.stringify(question.options)===JSON.stringify(source.question.options)&&question.answer===source.question.answer,`${question.id} 與來源題答案不一致`);
+        const expectedText=source.item.category==="reading"?source.item.content:source.item.audioText;
+        assert((question.passage||question.audioText)===expectedText,`${question.id} 與來源素材不一致`);
+        assert(periods.indexOf(source.item.unlockPeriod)<=periods.indexOf(assessment.unlockPeriod),`${question.id} 使用尚未解鎖的素材`);
+      }else{
+        const card=cards.get(question.sourceCardId);
+        assert(card,`${question.id} 找不到來源卡片 ${question.sourceCardId}`);
+        const correct=question.options[question.answer];
+        if(question.logic==="kanji-reading")assert(correct===card.reading,`${question.id} 漢字讀音答案錯誤`);
+        if(question.logic==="orthography")assert(correct===card.term,`${question.id} 表記答案錯誤`);
+        if(question.logic==="grammar-function")assert(correct===grammarFunctionJa(card.term)&&question.passage===card.examples[0].ja,`${question.id} 文法功能或例句錯誤`);
+        assert(periods.indexOf(card.unlockPeriod)<=periods.indexOf(assessment.unlockPeriod),`${question.id} 使用尚未解鎖的卡片`);
+      }
+    }
+  }
+  assert(examQuestionCount===460,`考試總題數 ${examQuestionCount}，應為 460`);
+  return {readingUnique:readingContents.size,listeningUnique:listeningScripts.size,sourceQuestions:sourceQuestions.size,examQuestions:examQuestionCount,uniqueExamSources:usedSources.size};
 }
+
+const questionAudit=auditGeneratedQuestions();
+
 const index = { generatedAt:new Date().toISOString(), periods, counts:{vocabulary:vocabulary.length,grammar:grammar.length,reading:reading.length,listening:listening.length,monthlyChecks:12,n3Mocks:5,n2Mocks:2}, unlockSchedule:periods.map((period,i)=>({period,vocabulary:vocabCaps[i],grammar:grammarCaps[i]})), sources:[{name:"Language-Learning-decks",url:"https://github.com/vbvss199/Language-Learning-decks",license:"MIT / CC BY-SA 4.0 frequency data"},{name:"EDRDG/JMdict",url:"https://www.edrdg.org/",license:"EDRDG licence"},{name:"JLPT sample questions",url:"https://www.jlpt.jp/e/samples/sampleindex.html",use:"link only"}] };
-fs.writeFileSync(path.join(root,"public","content","index.json"),JSON.stringify(index,null,2));
-console.log(index.counts);
+if (!dryRun) {
+  fs.mkdirSync(outRoot,{recursive:true});
+  for (const period of periods) {
+    const payload = { period, vocabulary:vocabulary.filter(x=>x.unlockPeriod===period), grammar:grammar.filter(x=>x.unlockPeriod===period), reading:reading.filter(x=>x.unlockPeriod===period), listening:listening.filter(x=>x.unlockPeriod===period), assessments:assessments.filter(x=>x.unlockPeriod===period) };
+    fs.writeFileSync(path.join(outRoot,`${period}.json`),JSON.stringify(payload));
+  }
+  fs.writeFileSync(path.join(root,"public","content","index.json"),JSON.stringify(index,null,2));
+}
+console.log({...index.counts,assessments:assessments.length,questionAudit,dryRun});
+if(printSamples)console.log(JSON.stringify({
+  readingVariants:[0,13,26,39].map((position)=>reading[position]),
+  listeningVariants:[0,13,26,39,52,65,78,91].map((position)=>listening[position]),
+  monthlySample:assessments[0].questions.slice(0,6),
+  n2MockSample:assessments.at(-1).questions.slice(-6)
+},null,2));
+if(printGrammarMap)console.log(JSON.stringify(Object.fromEntries(Object.entries(Object.groupBy(grammar,(item)=>grammarFunctionJa(item.term))).map(([key,items])=>[key,items.map((item)=>item.term)])),null,2));

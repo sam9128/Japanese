@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "generate:content": "node scripts/generate-content.mjs",
+    "audit:questions": "node scripts/generate-content.mjs --dry-run",
     "generate:zh-map": "python scripts/build-zh-map.py",
     "export:text": "node scripts/export-content-text.mjs",
     "validate:content": "node scripts/validate-content.mjs"

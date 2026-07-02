@@ -27,17 +27,68 @@ for(const card of all.grammar){
   if(card.audioText!==card.examples[0].ja)throw new Error(`grammar audio does not match example: ${card.id}`);
 }
 const hasJapanese=(value)=>/[\u3040-\u30ff\u3400-\u9fff]/.test(value||"");
-for(const assessment of all.assessments){
-  if(assessment.questions?.length!==assessment.questionCount)throw new Error(`assessment question count mismatch: ${assessment.id}`);
-  if(new Set(assessment.questions.map(question=>`${question.passage||""}${question.prompt}`)).size<assessment.questionCount*.8)throw new Error(`assessment questions repeat too much: ${assessment.id}`);
-  if(new Set(assessment.questions.map(question=>question.type)).size<4)throw new Error(`assessment item types insufficient: ${assessment.id}`);
-  for(const question of assessment.questions){
-    if(!hasJapanese(question.instruction)||!hasJapanese(question.prompt))throw new Error(`non-Japanese question: ${question.id}`);
-    if(question.options?.length!==4||question.options.some(option=>!hasJapanese(option)))throw new Error(`invalid Japanese options: ${question.id}`);
-    if(!Number.isInteger(question.answer)||question.answer<0||question.answer>3)throw new Error(`invalid answer: ${question.id}`);
-    if(!hasChinese(question.explanationZh))throw new Error(`missing Chinese answer explanation: ${question.id}`);
+const hasChineseMarker=(value)=>/[這裡還讓應該嗎個們]|下午|上午|二樓|選項|答案|中文|直接放棄|身邊的人/.test(value||"");
+const sourceQuestions=new Map();
+const awkwardPatterns=[/するください/,/するもらえ/,/事前に前日まで/,/までに前日まで/,/早めに前日まで/];
+if(new Set(all.reading.map(item=>item.content)).size!==52)throw new Error("reading passages are not all unique");
+if(new Set(all.listening.map(item=>item.audioText)).size!==104)throw new Error("listening scripts are not all unique");
+for(const item of [...all.reading,...all.listening]){
+  const sourceText=item.category==="reading"?item.content:item.audioText;
+  if(awkwardPatterns.some(pattern=>pattern.test(sourceText)))throw new Error(`unnatural Japanese construction: ${item.id}`);
+  const expectedCount=item.category==="reading"?2:1;
+  if(item.questions?.length!==expectedCount)throw new Error(`source question count mismatch: ${item.id}`);
+  if(item.category==="listening"&&(item.lines?.length!==5||item.audioText!==item.lines.join(" ")))throw new Error(`listening lines mismatch: ${item.id}`);
+  for(const question of item.questions){
+    if(!question.id||sourceQuestions.has(question.id))throw new Error(`duplicate source question ID: ${question.id}`);
+    if(!hasJapanese(question.prompt))throw new Error(`non-Japanese source prompt: ${question.id}`);
+    if(question.options?.length!==4||new Set(question.options).size!==4)throw new Error(`invalid source options: ${question.id}`);
+    if(question.options.some(option=>!hasJapanese(option)||hasChineseMarker(option)))throw new Error(`non-Japanese source option: ${question.id}`);
+    if(!Number.isInteger(question.answer)||question.answer<0||question.answer>3)throw new Error(`invalid source answer: ${question.id}`);
+    if(!question.evidence||!sourceText.includes(question.evidence))throw new Error(`source evidence mismatch: ${question.id}`);
+    if(!hasChinese(question.explanation))throw new Error(`missing Chinese source explanation: ${question.id}`);
+    sourceQuestions.set(question.id,{item,question});
   }
 }
+const cards=new Map([...all.vocabulary,...all.grammar].map(item=>[item.id,item]));
+const examIds=new Set();
+const examSignatures=new Set();
+const examSources=new Set();
+let examQuestionCount=0;
+for(const assessment of all.assessments){
+  if(assessment.questions?.length!==assessment.questionCount)throw new Error(`assessment question count mismatch: ${assessment.id}`);
+  for(const type of ["漢字読み","表記","文法形式","内容理解","ポイント理解"])if(!assessment.questions.some(question=>question.type===type))throw new Error(`assessment item type missing (${type}): ${assessment.id}`);
+  for(const question of assessment.questions){
+    examQuestionCount+=1;
+    if(examIds.has(question.id))throw new Error(`duplicate exam question ID: ${question.id}`);examIds.add(question.id);
+    const signature=`${question.passage||""}|${question.audioText||""}|${question.prompt}`;
+    if(examSignatures.has(signature))throw new Error(`duplicate exam question content: ${question.id}`);examSignatures.add(signature);
+    if(!hasJapanese(question.instruction)||!hasJapanese(question.prompt))throw new Error(`non-Japanese question: ${question.id}`);
+    if(question.options?.length!==4||new Set(question.options).size!==4||question.options.some(option=>!hasJapanese(option)||hasChineseMarker(option)))throw new Error(`invalid Japanese options: ${question.id}`);
+    if(!Number.isInteger(question.answer)||question.answer<0||question.answer>3)throw new Error(`invalid answer: ${question.id}`);
+    if(!hasChinese(question.explanationZh))throw new Error(`missing Chinese answer explanation: ${question.id}`);
+    const sourceId=question.sourceQuestionId||question.sourceCardId;
+    if(!sourceId||examSources.has(sourceId))throw new Error(`missing or reused question source: ${question.id}`);examSources.add(sourceId);
+    if(question.sourceQuestionId){
+      const source=sourceQuestions.get(question.sourceQuestionId);
+      if(!source)throw new Error(`source question not found: ${question.id}`);
+      if(question.prompt!==source.question.prompt||JSON.stringify(question.options)!==JSON.stringify(source.question.options)||question.answer!==source.question.answer)throw new Error(`source question answer mismatch: ${question.id}`);
+      const expectedText=source.item.category==="reading"?source.item.content:source.item.audioText;
+      if((question.passage||question.audioText)!==expectedText)throw new Error(`source material mismatch: ${question.id}`);
+      if(index.periods.indexOf(source.item.unlockPeriod)>index.periods.indexOf(assessment.unlockPeriod))throw new Error(`locked source used: ${question.id}`);
+    }else{
+      const card=cards.get(question.sourceCardId);
+      if(!card)throw new Error(`source card not found: ${question.id}`);
+      const correct=question.options[question.answer];
+      if((question.logic==="kanji-reading"||question.logic==="orthography")&&!card.readingQuizEligible)throw new Error(`unreliable reading used in exam: ${question.id}`);
+      if(question.logic==="kanji-reading"&&correct!==card.reading)throw new Error(`kanji reading answer mismatch: ${question.id}`);
+      if(question.logic==="orthography"&&correct!==card.term)throw new Error(`orthography answer mismatch: ${question.id}`);
+      if(question.logic==="grammar-function"&&(question.passage!==card.examples?.[0]?.ja||!question.explanationZh.includes(`「${correct}」`)))throw new Error(`grammar answer mismatch: ${question.id}`);
+      if(index.periods.indexOf(card.unlockPeriod)>index.periods.indexOf(assessment.unlockPeriod))throw new Error(`locked card used: ${question.id}`);
+    }
+  }
+}
+if(examQuestionCount!==460)throw new Error(`exam question total mismatch: ${examQuestionCount}`);
+if(examSources.size!==460)throw new Error(`exam sources are not unique: ${examSources.size}/460`);
 for(const [i,schedule] of index.unlockSchedule.entries()){
   const allowed=new Set(index.periods.slice(0,i+1));
   const vocab=all.vocabulary.filter(x=>allowed.has(x.unlockPeriod)).length;
