@@ -1,0 +1,66 @@
+const DB_NAME = "nihongo-stairs";
+const DB_VERSION = 2;
+const STORES = ["cardProgress", "studyEvents", "assessmentResults", "reports", "settings"];
+
+function openDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      for (const name of STORES) if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath:"id" });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getAll(storeName) {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(storeName).objectStore(storeName).getAll();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function put(storeName, value) {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(storeName, "readwrite").objectStore(storeName).put(value);
+    request.onsuccess = () => resolve(value);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function replaceAll(storeName, values) {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, "readwrite");
+    const store = tx.objectStore(storeName);
+    store.clear();
+    values.forEach((value) => store.put(value));
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function loadSnapshot() {
+  const entries = await Promise.all(STORES.map(async (name) => [name, await getAll(name)]));
+  return Object.fromEntries(entries);
+}
+
+export async function restoreSnapshot(snapshot) {
+  for (const name of STORES) await replaceAll(name, Array.isArray(snapshot[name]) ? snapshot[name] : []);
+}
+
+export async function migrateLegacyProgress() {
+  const migration = await getAll("settings");
+  if (migration.some((item) => item.id === "legacy-migrated")) return;
+  try {
+    const legacy = JSON.parse(localStorage.getItem("nihongo-stairs-progress-v1"));
+    if (legacy?.ratings) {
+      for (const [id, rating] of Object.entries(legacy.ratings)) await put("cardProgress", { id, rating, updatedAt:new Date().toISOString() });
+    }
+  } catch { /* malformed legacy data is ignored */ }
+  await put("settings", { id:"legacy-migrated", value:true });
+}
