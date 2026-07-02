@@ -5,6 +5,15 @@ import { getJapaneseVoices, speakJapanese, stopSpeech } from "./speech";
 
 const NAV = [["today","今日學習","今"],["library","教材庫","本"],["media","閱讀聽力","聽"],["mock","模考","試"],["progress","進度成果","績"],["settings","設定","設"]];
 const EMPTY = { vocabulary:[], grammar:[], reading:[], listening:[], assessments:[], index:{counts:{}} };
+const STRONG_RATINGS = new Set(["good","easy"]);
+
+function buildDailyBatches(vocabulary, grammar) {
+  const count = Math.max(Math.ceil(vocabulary.length / 6), Math.ceil(grammar.length / 3));
+  return Array.from({length:count}, (_, index) => [
+    ...vocabulary.slice(index * 6, index * 6 + 6),
+    ...grammar.slice(index * 3, index * 3 + 3),
+  ]).filter((batch) => batch.length);
+}
 
 function useLearningStore() {
   const [progress, setProgress] = useState({});
@@ -40,14 +49,22 @@ function PeriodRail({ activePeriod, setActivePeriod, data }) {
 
 function TodayView({ data, activePeriod, store, settings, goMedia }) {
   const unlocked = useMemo(()=>({v:data.vocabulary.filter(x=>isUnlocked(x,activePeriod)),g:data.grammar.filter(x=>isUnlocked(x,activePeriod)),r:data.reading.filter(x=>isUnlocked(x,activePeriod)),l:data.listening.filter(x=>isUnlocked(x,activePeriod))}),[data,activePeriod]);
-  const cards = useMemo(()=>[...unlocked.v.slice(0,6),...unlocked.g.slice(0,3)], [unlocked]);
-  const [index,setIndex]=useState(0); const [revealed,setRevealed]=useState(false); const card=cards[index%Math.max(1,cards.length)];
-  const doneToday=store.events.filter(x=>x.occurredAt?.slice(0,10)===new Date().toISOString().slice(0,10)).length;
-  async function rate(value){await store.rate(card,value);setRevealed(false);setIndex((x)=>(x+1)%cards.length)}
-  if(!card)return <Empty text="這個月份尚無可學教材。"/>;
-  return <section className="today-view"><div className="page-intro"><div><span className="eyebrow">TODAY · {formatPeriod(activePeriod)}</span><h1>把零碎時間，疊成日語實力。</h1><p>今天約 20 分鐘：6 個單字、3 個文法，再選一組閱讀或聽力。</p></div><div className="today-ring"><strong>{doneToday}</strong><span>/ 10</span><small>今日完成</small></div></div>
+  const batches = useMemo(()=>buildDailyBatches(unlocked.v,unlocked.g),[unlocked.v,unlocked.g]);
+  const batchIndex = useMemo(()=>{let completed=0;for(const batch of batches){if(!batch.every(item=>STRONG_RATINGS.has(store.progress[item.id]?.rating)))break;completed+=1}return completed},[batches,store.progress]);
+  const cards=batches[batchIndex]||[];
+  const completedInBatch=cards.filter(item=>STRONG_RATINGS.has(store.progress[item.id]?.rating)).length;
+  const [index,setIndex]=useState(0); const [revealed,setRevealed]=useState(false); const [notice,setNotice]=useState(""); const card=cards[index%Math.max(1,cards.length)];
+  useEffect(()=>{setIndex(0);setRevealed(false)},[batchIndex,activePeriod]);
+  async function rate(value){
+    const willAdvance=STRONG_RATINGS.has(value)&&cards.every(item=>item.id===card.id||STRONG_RATINGS.has(store.progress[item.id]?.rating));
+    await store.rate(card,value,{dailyBatch:batchIndex+1,unlockPeriod:activePeriod});
+    setRevealed(false);
+    if(willAdvance){setIndex(0);setNotice(batches[batchIndex+1]?.length?`本批次全部達到「記得」以上，已自動開放第 ${batchIndex+2} 批新內容。`:"目前開放的教材已全部完成！")}else{setNotice("");setIndex((current)=>(current+1)%cards.length)}
+  }
+  if(!card)return <section className="today-view"><div className="page-intro"><div><span className="eyebrow">TODAY · {formatPeriod(activePeriod)}</span><h1>目前教材已全部完成。</h1><p>你已將所有開放內容標記為「記得」或「很熟」，可以前往閱讀聽力繼續練習。</p></div></div><Empty text="太棒了，等待下一階段解鎖吧！"/></section>;
+  return <section className="today-view"><div className="page-intro"><div><span className="eyebrow">TODAY · {formatPeriod(activePeriod)} · 第 {batchIndex+1} 批</span><h1>把零碎時間，疊成日語實力。</h1><p>本批 6 個單字、3 個文法；全部標為「記得」或「很熟」後，自動開放下一批。</p></div><div className="today-ring"><strong>{completedInBatch}</strong><span>/ {cards.length}</span><small>本批達標</small></div></div>{notice&&<div className="week-card unlock-notice" role="status">✓ {notice}</div>}
     <div className="dashboard-grid"><div className="lesson-card"><div className="lesson-top"><span>{card.level} · {card.category==="vocab"?"單字":"文法"}</span><button onClick={()=>speakJapanese(card.audioText,settings)}>▶ 播放單字／句型</button></div><div className="card-main" onClick={()=>setRevealed(true)}><h2>{card.term}</h2><p className="reading">{card.reading}</p>{revealed?<div className="answer"><strong>{card.meaningZh}</strong><span className="usage-note">{card.usageZh}</span><div className="example-line"><p>{card.examples?.[0]?.ja}</p><ExampleAudio text={card.examples?.[0]?.ja} settings={settings}/></div><small>{card.examples?.[0]?.zh}</small></div>:<button className="reveal">翻卡看答案</button>}</div><div className="rating-row"><button onClick={()=>rate("again")}>再一次</button><button onClick={()=>rate("hard")}>有點難</button><button onClick={()=>rate("good")}>記得</button><button onClick={()=>rate("easy")}>很熟</button></div><footer><button onClick={()=>{setIndex((index-1+cards.length)%cards.length);setRevealed(false)}}>← 上一張</button><span>{index+1} / {cards.length}</span><button onClick={()=>{setIndex((index+1)%cards.length);setRevealed(false)}}>下一張 →</button></footer></div>
-      <aside className="today-side"><h3>接下來</h3><button className="task" onClick={()=>goMedia("reading")}><b>08 分</b><span>閱讀理解<br/><small>{unlocked.r[0]?.term || "本月閱讀"}</small></span></button><button className="task" onClick={()=>goMedia("listening")}><b>06 分</b><span>逐句聽力<br/><small>{unlocked.l[0]?.term || "本月聽力"}</small></span></button><div className="week-card"><span>本週節奏</span><strong>{store.events.filter(x=>Date.now()-new Date(x.occurredAt)<604800000).length} 次練習</strong><p>錯題會自動留在教材庫供你重練。</p></div></aside></div></section>;
+      <aside className="today-side"><h3>接下來</h3><button className="task" onClick={()=>goMedia("reading")}><b>08 分</b><span>閱讀理解<br/><small>{unlocked.r[0]?.term || "本月閱讀"}</small></span></button><button className="task" onClick={()=>goMedia("listening")}><b>06 分</b><span>逐句聽力<br/><small>{unlocked.l[0]?.term || "本月聽力"}</small></span></button><div className="week-card"><span>自動解鎖</span><strong>{completedInBatch} / {cards.length} 張達標</strong><p>本批全部達到「記得」以上，就會立即開放下一批新內容。</p></div></aside></div></section>;
 }
 
 function LibraryView({data,activePeriod,store,settings}) {
