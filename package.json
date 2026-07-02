@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "generate:content": "node scripts/generate-content.mjs",
+    "generate:zh-map": "python scripts/build-zh-map.py",
     "validate:content": "node scripts/validate-content.mjs"
   },
   "dependencies": {
@@ -18,6 +19,7 @@
     "vite": "latest"
   },
   "devDependencies": {
+    "opencc-js": "^1.3.2",
     "playwright-core": "^1.61.1"
   }
 }

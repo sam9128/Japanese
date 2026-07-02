@@ -1,4 +1,4 @@
-const CACHE="nihongo-stairs-v3";
+const CACHE="nihongo-stairs-v5-jlpt-exams";
 const PERIODS=["115-07","115-08","115-09","115-10","115-11","115-12","116-01","116-02","116-03","116-04","116-05","116-06"];
 const PRELOAD=["./","./offline.html","./manifest.webmanifest","./icons/icon.svg","./content/index.json",...PERIODS.map(period=>`./content/periods/${period}.json`)];
 
