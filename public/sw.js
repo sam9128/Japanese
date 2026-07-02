@@ -1,6 +1,6 @@
-const CACHE="nihongo-stairs-v5-jlpt-exams";
+const CACHE="nihongo-stairs-v6-complete-text";
 const PERIODS=["115-07","115-08","115-09","115-10","115-11","115-12","116-01","116-02","116-03","116-04","116-05","116-06"];
-const PRELOAD=["./","./offline.html","./manifest.webmanifest","./icons/icon.svg","./content/index.json",...PERIODS.map(period=>`./content/periods/${period}.json`)];
+const PRELOAD=["./","./offline.html","./manifest.webmanifest","./icons/icon.svg","./日語階梯_完整教材.txt","./content/index.json",...PERIODS.map(period=>`./content/periods/${period}.json`)];
 
 async function installApp(){
   const cache=await caches.open(CACHE);

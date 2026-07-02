@@ -9,6 +9,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "generate:content": "node scripts/generate-content.mjs",
     "generate:zh-map": "python scripts/build-zh-map.py",
+    "export:text": "node scripts/export-content-text.mjs",
     "validate:content": "node scripts/validate-content.mjs"
   },
   "dependencies": {
