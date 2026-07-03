@@ -28,7 +28,7 @@ jobs:
       - run: pnpm run validate:sync
       - run: pnpm build
         env:
-          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID || '440469318854-ulndijqb6n60omrihk6b6bh42uho40k1.apps.googleusercontent.com' }}
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
