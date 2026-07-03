@@ -168,6 +168,9 @@ function explainGrammar(term) {
 function grammarUsageZh(term) {
   return `接續提示：先辨認「${term}」前面接名詞、動詞普通形或其他形式，再判斷它在句中表示條件、原因、時間、程度或說話者態度。`;
 }
+function grammarAudioText(term) {
+  return term.replace(/[〜～]/g, "").replace(/[（(][^）)]*[）)]/g, "").trim();
+}
 function makeGrammar() {
   const unique = [...new Set(grammarPatterns)].slice(0, 240);
   if (unique.length < 240) throw new Error(`文法句型不足：${unique.length}`);
@@ -177,7 +180,7 @@ function makeGrammar() {
     id: `grammar-${String(index + 1).padStart(3, "0")}`, level: index < 180 ? "N3" : "N2", category: "grammar", term,
     reading: "文法句型", meaningZh: explainGrammar(term), usageZh: grammarUsageZh(term),
     examples: [{ ja: grammarExamples.get(term), zh: `中文解析：這句使用「${term}」。${explainGrammar(term)}` }],
-    audioText: grammarExamples.get(term), unlockPeriod: periodFor(index, grammarCaps),
+    audioText: grammarAudioText(term), unlockPeriod: periodFor(index, grammarCaps),
     tags: [index < 180 ? "N3文法" : "N2文法"], sourceRefs: ["self-authored"], license: "CC BY 4.0 — 本計畫自編"
   }));
 }

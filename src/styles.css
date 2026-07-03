@@ -418,7 +418,7 @@ a {
   color: #68736a;
   font-size: 13px;
 }
-.library-list button {
+.library-list > article > button {
   border: 1px solid var(--line);
   background: #fff;
   border-radius: 50%;
@@ -1163,6 +1163,18 @@ body {
 .library-example small {
   display: block;
   margin-top: 6px;
+}
+.example-translation {
+  margin: 10px 0 0;
+  padding: 9px 12px;
+  border-left: 3px solid var(--moss);
+  background: #f4f7f2;
+  color: #425348;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.example-translation strong {
+  color: var(--green);
 }
 .exam-notice {
   max-width: 800px;

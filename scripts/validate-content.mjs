@@ -24,7 +24,9 @@ const grammarExamples=all.grammar.map(card=>card.examples?.[0]?.ja);
 if(new Set(grammarExamples).size!==240)throw new Error(`grammar examples are not unique: ${new Set(grammarExamples).size}/240`);
 for(const card of all.grammar){
   if(!card.examples?.[0]?.ja||card.examples[0].ja.includes("〜"))throw new Error(`invalid grammar example: ${card.id}`);
-  if(card.audioText!==card.examples[0].ja)throw new Error(`grammar audio does not match example: ${card.id}`);
+  const expectedAudio=card.term.replace(/[〜～]/g, "").replace(/[（(][^）)]*[）)]/g, "").trim();
+  if(card.audioText!==expectedAudio)throw new Error(`grammar audio does not match pattern: ${card.id}`);
+  if(card.audioText===card.examples[0].ja)throw new Error(`grammar pattern audio duplicates example: ${card.id}`);
 }
 const hasJapanese=(value)=>/[\u3040-\u30ff\u3400-\u9fff]/.test(value||"");
 const hasChineseMarker=(value)=>/[這裡還讓應該嗎個們]|下午|上午|二樓|選項|答案|中文|直接放棄|身邊的人/.test(value||"");

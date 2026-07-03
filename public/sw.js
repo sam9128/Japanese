@@ -1,4 +1,4 @@
-const CACHE = "nihongo-stairs-v11-google-drive-sync";
+const CACHE = "nihongo-stairs-v13-example-translations";
 const PERIODS = [
   "115-07",
   "115-08",
@@ -53,25 +53,26 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   // Authentication and account data must never enter the shared PWA cache.
   if (url.origin !== self.location.origin) return;
-  event.respondWith(
-    caches.match(event.request).then(
-      (cached) =>
-        cached ||
-        fetch(event.request)
-          .then((response) => {
-            if (response.ok && response.type === "basic") {
-              const copy = response.clone();
-              void caches
-                .open(CACHE)
-                .then((cache) => cache.put(event.request, copy));
-            }
-            return response;
-          })
-          .catch(() =>
-            event.request.mode === "navigate"
-              ? caches.match("./offline.html")
-              : cached,
-          ),
-    ),
-  );
+  event.respondWith(handleRequest(event.request));
 });
+
+async function handleRequest(request) {
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(request.url, { ignoreSearch: true });
+  if (cached) return cached;
+  try {
+    const response = await fetch(request);
+    if (response.ok && response.type === "basic") {
+      await cache.put(request.url, response.clone());
+    }
+    return response;
+  } catch {
+    if (request.mode === "navigate") {
+      return (
+        (await cache.match(new URL("./offline.html", self.location.href).href)) ||
+        Response.error()
+      );
+    }
+    return Response.error();
+  }
+}

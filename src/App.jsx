@@ -297,6 +297,17 @@ function ExampleAudio({ text, settings, label = "例句" }) {
   );
 }
 
+function ExampleTranslation({ text }) {
+  if (!text) return null;
+  const translation = text.replace(/^中文解析[：:]\s*/, "");
+  return (
+    <p className="example-translation">
+      <strong>中文翻譯／解析：</strong>
+      {translation}
+    </p>
+  );
+}
+
 function PeriodRail({ activePeriod, setActivePeriod, data }) {
   const currentIndex = PERIODS.indexOf(currentRocPeriod());
   return (
@@ -460,7 +471,7 @@ function TodayView({
               {card.level} · {card.category === "vocab" ? "單字" : "文法"}
             </span>
             <button onClick={() => speakJapanese(card.audioText, settings)}>
-              ▶ 播放單字／句型
+              ▶ {card.category === "grammar" ? "播放文法句型" : "播放單字"}
             </button>
           </div>
           <div
@@ -482,7 +493,7 @@ function TodayView({
                     settings={settings}
                   />
                 </div>
-                <small>{card.examples?.[0]?.zh}</small>
+                <ExampleTranslation text={card.examples?.[0]?.zh} />
               </div>
             ) : (
               <button className="reveal">翻卡看答案</button>
@@ -634,7 +645,7 @@ function LibraryView({
                   text={item.examples?.[0]?.ja}
                   settings={settings}
                 />
-                <small>{item.examples?.[0]?.zh}</small>
+                <ExampleTranslation text={item.examples?.[0]?.zh} />
               </details>
             </div>
             <button

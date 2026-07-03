@@ -26,7 +26,7 @@ function addSources(item) {
 function addExamples(examples = []) {
   examples.forEach((example, index) => {
     add(`例句${index + 1}：${example.ja}`);
-    if (example.zh) add(`例句中文解析：${example.zh}`);
+    if (example.zh) add(`例句中文翻譯／解析：${example.zh.replace(/^中文解析[：:]\s*/, "")}`);
   });
 }
 
