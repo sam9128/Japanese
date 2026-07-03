@@ -32,6 +32,8 @@ pnpm run validate:content
 
 生成器預期詞彙來源位於專案上層 `tmp/language-learning-decks/japanese/`。網站正式執行只讀取已生成的月份分包，不依賴該暫存資料夾。
 
+例句繁體中文直譯保存在 `scripts/source/example-translations-zh.json`，網站執行時不會連線翻譯服務。新增例句後可執行 `pnpm run translate:examples` 補齊缺漏，再重新產生與驗證教材；此命令只傳送公開教材例句，不傳送使用者資料。
+
 ## 資料與著作權
 
 完整署名請見 `public/content/ATTRIBUTION.md`。JLPT 官方試題與音檔只提供來源連結，未收錄或轉載。

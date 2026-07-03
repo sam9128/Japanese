@@ -10,6 +10,7 @@
     "generate:content": "node scripts/generate-content.mjs",
     "audit:questions": "node scripts/generate-content.mjs --dry-run",
     "generate:zh-map": "python scripts/build-zh-map.py",
+    "translate:examples": "node scripts/translate-examples.mjs",
     "export:text": "node scripts/export-content-text.mjs",
     "validate:content": "node scripts/validate-content.mjs",
     "validate:sync": "node scripts/validate-sync.mjs"

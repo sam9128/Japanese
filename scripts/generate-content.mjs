@@ -14,6 +14,12 @@ const periods = ["115-07", "115-08", "115-09", "115-10", "115-11", "115-12", "11
 const vocabCaps = [400, 800, 1200, 1600, 1600, 1600, 2400, 2800, 3200, 3600, 4000, 4000];
 const grammarCaps = [60, 120, 180, 240, 240, 240, 240, 240, 240, 240, 240, 240];
 const ecdictZh = JSON.parse(fs.readFileSync(path.join(root, "scripts", "source", "ecdict-zh.json"), "utf8"));
+const exampleTranslationsZh = JSON.parse(
+  fs.readFileSync(
+    path.join(root, "scripts", "source", "example-translations-zh.json"),
+    "utf8",
+  ),
+);
 const toTraditional = Converter({ from: "cn", to: "tw" });
 const posZh = { noun:"名詞", verb:"動詞", adjective:"形容詞", adverb:"副詞", pronoun:"代名詞", conjunction:"接續詞", preposition:"助詞用法", interjection:"感嘆詞" };
 const termZhOverrides = {
@@ -127,6 +133,9 @@ function loadWords() {
     .slice(0, 4000);
   return all.map((item, index) => {
     const meaningZh = toZh(item.english_translation, item.word);
+    const exampleJa = item.example_sentence_native || `${item.word}について勉強します。`;
+    const exampleZh = exampleTranslationsZh[exampleJa];
+    if (!exampleZh) throw new Error(`例句缺少中文翻譯：${exampleJa}`);
     return ({
     id: `vocab-${String(index + 1).padStart(4, "0")}`,
     level: index < 1600 ? "N3" : "N2",
@@ -137,7 +146,7 @@ function loadWords() {
     meaningZh,
     meaningEn: item.english_translation,
     usageZh: usageZh(item, meaningZh),
-    examples: [{ ja: item.example_sentence_native || `${item.word}について勉強します。`, zh: `中文解析：本句使用「${item.word}」表達「${meaningZh}」。請觀察它和前後詞語的搭配。` }],
+    examples: [{ ja: exampleJa, zh: exampleZh, explanationZh: `本句使用「${item.word}」表達「${meaningZh}」。請觀察它和前後詞語的搭配。` }],
     audioText: item.word,
     unlockPeriod: periodFor(index, vocabCaps),
     tags: [item.pos || "word", item.cefr_level || "Unknown"],
@@ -176,13 +185,18 @@ function makeGrammar() {
   if (unique.length < 240) throw new Error(`文法句型不足：${unique.length}`);
   const missingExamples = unique.filter((term) => !grammarExamples.has(term));
   if (missingExamples.length) throw new Error(`文法例句不足：${missingExamples.join("、")}`);
-  return unique.map((term, index) => ({
-    id: `grammar-${String(index + 1).padStart(3, "0")}`, level: index < 180 ? "N3" : "N2", category: "grammar", term,
-    reading: "文法句型", meaningZh: explainGrammar(term), usageZh: grammarUsageZh(term),
-    examples: [{ ja: grammarExamples.get(term), zh: `中文解析：這句使用「${term}」。${explainGrammar(term)}` }],
-    audioText: grammarAudioText(term), unlockPeriod: periodFor(index, grammarCaps),
-    tags: [index < 180 ? "N3文法" : "N2文法"], sourceRefs: ["self-authored"], license: "CC BY 4.0 — 本計畫自編"
-  }));
+  return unique.map((term, index) => {
+    const exampleJa = grammarExamples.get(term);
+    const exampleZh = exampleTranslationsZh[exampleJa];
+    if (!exampleZh) throw new Error(`例句缺少中文翻譯：${exampleJa}`);
+    return {
+      id: `grammar-${String(index + 1).padStart(3, "0")}`, level: index < 180 ? "N3" : "N2", category: "grammar", term,
+      reading: "文法句型", meaningZh: explainGrammar(term), usageZh: grammarUsageZh(term),
+      examples: [{ ja: exampleJa, zh: exampleZh, explanationZh: `這句使用「${term}」。${explainGrammar(term)}` }],
+      audioText: grammarAudioText(term), unlockPeriod: periodFor(index, grammarCaps),
+      tags: [index < 180 ? "N3文法" : "N2文法"], sourceRefs: ["self-authored"], license: "CC BY 4.0 — 本計畫自編"
+    };
+  });
 }
 
 function rotateOptions(correct, distractors, seed) {

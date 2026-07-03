@@ -17,7 +17,9 @@ const hasChinese=(value)=>/[\u3400-\u9fff]/.test(value||"");
 for(const card of [...all.vocabulary,...all.grammar]){
   if(!hasChinese(card.meaningZh))throw new Error(`missing Chinese meaning: ${card.id}`);
   if(!hasChinese(card.usageZh))throw new Error(`missing Chinese usage explanation: ${card.id}`);
-  if(!hasChinese(card.examples?.[0]?.zh)||/^英[：:]/.test(card.examples?.[0]?.zh||""))throw new Error(`missing Chinese example explanation: ${card.id}`);
+  const example=card.examples?.[0];
+  if(!hasChinese(example?.zh)||example.zh===example.ja||/^(中文解析|英)[：:]/.test(example.zh||""))throw new Error(`missing literal Chinese example translation: ${card.id}`);
+  if(!hasChinese(example?.explanationZh))throw new Error(`missing Chinese example explanation: ${card.id}`);
 }
 if(all.vocabulary.some(card=>/^英[：:]/.test(card.meaningZh)))throw new Error("English-only vocabulary meaning detected");
 const grammarExamples=all.grammar.map(card=>card.examples?.[0]?.ja);

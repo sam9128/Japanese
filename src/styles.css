@@ -1173,6 +1173,15 @@ body {
   font-size: 13px;
   line-height: 1.7;
 }
+.example-translation p {
+  margin: 0;
+  color: #425348;
+}
+.example-translation p + p {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
 .example-translation strong {
   color: var(--green);
 }

@@ -297,14 +297,21 @@ function ExampleAudio({ text, settings, label = "例句" }) {
   );
 }
 
-function ExampleTranslation({ text }) {
-  if (!text) return null;
-  const translation = text.replace(/^中文解析[：:]\s*/, "");
+function ExampleTranslation({ example }) {
+  if (!example?.zh) return null;
   return (
-    <p className="example-translation">
-      <strong>中文翻譯／解析：</strong>
-      {translation}
-    </p>
+    <div className="example-translation">
+      <p>
+        <strong>中文翻譯：</strong>
+        {example.zh}
+      </p>
+      {example.explanationZh ? (
+        <p>
+          <strong>中文解析：</strong>
+          {example.explanationZh}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -493,7 +500,7 @@ function TodayView({
                     settings={settings}
                   />
                 </div>
-                <ExampleTranslation text={card.examples?.[0]?.zh} />
+                <ExampleTranslation example={card.examples?.[0]} />
               </div>
             ) : (
               <button className="reveal">翻卡看答案</button>
@@ -645,7 +652,7 @@ function LibraryView({
                   text={item.examples?.[0]?.ja}
                   settings={settings}
                 />
-                <ExampleTranslation text={item.examples?.[0]?.zh} />
+                <ExampleTranslation example={item.examples?.[0]} />
               </details>
             </div>
             <button
