@@ -1,6 +1,15 @@
 # 日語階梯
 
-N3 → N2 年度離線學習 PWA。所有學習紀錄只保存在瀏覽器 IndexedDB，不上傳伺服器。
+N3 → N2 年度離線學習 PWA。未登入時資料保存在 IndexedDB；登入後可透過 Supabase 在手機與電腦間同步。
+
+## 帳號與跨裝置同步
+
+1. 在 Supabase 建立專案，於 SQL Editor 執行 `supabase/schema.sql`。
+2. 複製 `.env.example` 為 `.env.local`，填入 Project URL 與 Publishable Key。
+3. GitHub Pages 部署時建立 Repository variable `VITE_SUPABASE_URL`，以及 Repository secret `VITE_SUPABASE_PUBLISHABLE_KEY`。
+4. Supabase Authentication → URL Configuration 的 Site URL 與 Redirect URLs 加入 `https://sam9128.github.io/Japanese/`。
+
+前端只使用可公開的 Publishable Key；請勿放入 `service_role` key。每位使用者的資料由 PostgreSQL RLS 依 `auth.uid()` 隔離。
 
 ## 本機執行
 
