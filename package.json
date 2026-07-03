@@ -12,11 +12,9 @@
     "generate:zh-map": "python scripts/build-zh-map.py",
     "export:text": "node scripts/export-content-text.mjs",
     "validate:content": "node scripts/validate-content.mjs",
-    "validate:sync": "node scripts/validate-sync.mjs",
-    "validate:cloud": "node scripts/validate-cloud-config.mjs"
+    "validate:sync": "node scripts/validate-sync.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.110.0",
     "@vitejs/plugin-react": "latest",
     "react": "latest",
     "react-dom": "latest",

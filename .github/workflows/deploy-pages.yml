@@ -26,14 +26,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run validate:content
       - run: pnpm run validate:sync
-      - run: pnpm run validate:cloud
-        env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
       - run: pnpm build
         env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4

@@ -8,9 +8,14 @@ export const STORES = [
   "settings",
 ];
 export const DATA_CHANGED_EVENT = "nihongo:data-changed";
+export const REMOTE_APPLIED_EVENT = "nihongo:remote-applied";
 
 function notifyDataChanged(detail = {}) {
   window.dispatchEvent(new CustomEvent(DATA_CHANGED_EVENT, { detail }));
+}
+
+export function notifyRemoteApplied() {
+  window.dispatchEvent(new CustomEvent(REMOTE_APPLIED_EVENT));
 }
 
 function openDatabase() {
@@ -75,7 +80,7 @@ export async function loadSnapshot() {
 
 export async function restoreSnapshot(
   snapshot,
-  { notify = true, forceCloud = false } = {},
+  { notify = true, forceDrive = false } = {},
 ) {
   for (const name of STORES)
     await replaceAll(
@@ -83,15 +88,8 @@ export async function restoreSnapshot(
       Array.isArray(snapshot[name]) ? snapshot[name] : [],
       { notify: false },
     );
-  if (forceCloud) localStorage.setItem("nihongo-stairs-force-cloud-sync", "1");
-  if (notify) notifyDataChanged({ restored: true, forceCloud });
-}
-
-export async function clearLocalLearningData({ notify = true } = {}) {
-  for (const name of STORES) await replaceAll(name, [], { notify: false });
-  localStorage.removeItem("nihongo-stairs-ui-session");
-  localStorage.removeItem("nihongo-stairs-progress-v1");
-  if (notify) notifyDataChanged({ cleared: true });
+  if (forceDrive) localStorage.setItem("nihongo-stairs-force-drive-sync", "1");
+  if (notify) notifyDataChanged({ restored: true, forceDrive });
 }
 
 export async function migrateLegacyProgress() {

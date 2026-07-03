@@ -1,51 +1,103 @@
 import { mergeSnapshots, snapshotsEqual } from "./syncData.js";
 
-export async function runSnapshotSync({
+export const DRIVE_SYNC_VERSION = 1;
+
+export function isDriveEnvelope(value) {
+  return Boolean(
+    value &&
+      value.syncVersion === DRIVE_SYNC_VERSION &&
+      typeof value.deviceId === "string" &&
+      value.deviceId &&
+      value.snapshot &&
+      typeof value.snapshot === "object",
+  );
+}
+
+function latestOwnEntry(entries, deviceId) {
+  return entries
+    .filter(({ envelope }) => envelope.deviceId === deviceId)
+    .sort(
+      (left, right) =>
+        Date.parse(right.file.modifiedTime || 0) -
+        Date.parse(left.file.modifiedTime || 0),
+    )[0];
+}
+
+export async function runDriveSnapshotSync({
   adapter,
-  userId,
+  deviceId,
   loadLocal,
   saveLocal,
   force = false,
-  maxAttempts = 3,
 }) {
-  if (!userId) throw new Error("Authentication required");
-  if (force) await adapter.deleteSnapshot(userId);
+  if (!deviceId) throw new Error("Missing device identifier");
+  const local = await loadLocal();
+  const files = await adapter.listSnapshots();
 
-  let local = await loadLocal();
-  let localApplied = local;
-  let localChanged = false;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const cloudRow = await adapter.readSnapshot(userId);
-    const merged = mergeSnapshots(local, cloudRow?.payload || {});
-
-    if (!snapshotsEqual(localApplied, merged)) {
-      await saveLocal(merged);
-      localApplied = merged;
-      localChanged = true;
-    }
-
-    if (cloudRow && snapshotsEqual(cloudRow.payload, merged)) {
-      return { localChanged, updatedAt: cloudRow.updatedAt };
-    }
-
-    try {
-      const outcome = await adapter.writeSnapshot({
-        expectedRevision: cloudRow?.revision || 0,
-        payload: merged,
-      });
-      if (outcome?.applied) {
-        return {
-          localChanged,
-          updatedAt: outcome.updatedAt || new Date().toISOString(),
-        };
-      }
-      local = mergeSnapshots(merged, outcome?.payload || {});
-    } catch (error) {
-      if (error?.code !== "23505") throw error;
-      local = merged;
-    }
+  if (force) {
+    if (files.length) await adapter.deleteSnapshots(files);
+    const updatedAt = new Date().toISOString();
+    await adapter.upsertDeviceSnapshot({
+      deviceId,
+      existingFile: null,
+      envelope: {
+        syncVersion: DRIVE_SYNC_VERSION,
+        deviceId,
+        updatedAt,
+        snapshot: local,
+      },
+    });
+    return { localChanged: false, updatedAt, fileCount: 1 };
   }
 
-  throw new Error("資料同時在其他裝置更新，請再按一次同步。");
+  const downloaded = await Promise.all(
+    files.map(async (file) => {
+      try {
+        const envelope = await adapter.downloadSnapshot(file);
+        return isDriveEnvelope(envelope) ? { file, envelope } : null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const entries = downloaded.filter(Boolean);
+  let merged = local;
+  for (const { envelope } of entries) {
+    merged = mergeSnapshots(merged, envelope.snapshot);
+  }
+
+  const localChanged = !snapshotsEqual(local, merged);
+  if (localChanged) await saveLocal(merged);
+
+  const own = latestOwnEntry(entries, deviceId);
+  const needsUpload = !own || !snapshotsEqual(own.envelope.snapshot, merged);
+  const updatedAt = needsUpload
+    ? new Date().toISOString()
+    : own.envelope.updatedAt || own.file.modifiedTime;
+  if (needsUpload) {
+    await adapter.upsertDeviceSnapshot({
+      deviceId,
+      existingFile: own?.file || null,
+      envelope: {
+        syncVersion: DRIVE_SYNC_VERSION,
+        deviceId,
+        updatedAt,
+        snapshot: merged,
+      },
+    });
+  }
+
+  const duplicates = entries
+    .filter(
+      ({ envelope, file }) =>
+        envelope.deviceId === deviceId && file.id !== own?.file.id,
+    )
+    .map(({ file }) => file);
+  if (duplicates.length) await adapter.deleteSnapshots(duplicates);
+
+  return {
+    localChanged,
+    updatedAt,
+    fileCount: files.length + (own ? 0 : 1) - duplicates.length,
+  };
 }

@@ -10,12 +10,14 @@ import {
   getAll,
   loadSnapshot,
   migrateLegacyProgress,
+  notifyRemoteApplied,
   put,
+  REMOTE_APPLIED_EVENT,
   restoreSnapshot,
 } from "./db";
 import { getJapaneseVoices, speakJapanese, stopSpeech } from "./speech";
-import AuthPanel from "./AuthPanel";
-import { useCloudAccount } from "./useCloudAccount";
+import DriveSyncPanel from "./DriveSyncPanel";
+import { useGoogleDriveSync } from "./useGoogleDriveSync";
 
 const NAV = [
   ["today", "今日學習", "今"],
@@ -82,22 +84,28 @@ function useUiSession(defaultPeriod) {
   );
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    getAll("settings")
-      .then((items) => {
-        let local = null;
-        try {
-          local = JSON.parse(localStorage.getItem("nihongo-stairs-ui-session"));
-        } catch {
-          /* ignore malformed local mirror */
-        }
-        const stored = items.find((item) => item.id === "ui-session")?.value;
-        const saved =
-          new Date(local?.updatedAt || 0) > new Date(stored?.updatedAt || 0)
-            ? local
-            : stored;
-        setSession(mergeUiSession(saved, defaultPeriod));
-      })
-      .finally(() => setReady(true));
+    const load = () =>
+      getAll("settings")
+        .then((items) => {
+          let local = null;
+          try {
+            local = JSON.parse(
+              localStorage.getItem("nihongo-stairs-ui-session"),
+            );
+          } catch {
+            /* ignore malformed local mirror */
+          }
+          const stored = items.find((item) => item.id === "ui-session")?.value;
+          const saved =
+            new Date(local?.updatedAt || 0) > new Date(stored?.updatedAt || 0)
+              ? local
+              : stored;
+          setSession(mergeUiSession(saved, defaultPeriod));
+        })
+        .finally(() => setReady(true));
+    void load();
+    window.addEventListener(REMOTE_APPLIED_EVENT, load);
+    return () => window.removeEventListener(REMOTE_APPLIED_EVENT, load);
   }, [defaultPeriod]);
   useEffect(() => {
     if (!ready) return;
@@ -164,20 +172,23 @@ function useLearningStore() {
   const [events, setEvents] = useState([]);
   const [results, setResults] = useState([]);
   const [ready, setReady] = useState(false);
+  const load = useCallback(async () => {
+    const [savedProgress, savedEvents, savedResults] = await Promise.all([
+      getAll("cardProgress"),
+      getAll("studyEvents"),
+      getAll("assessmentResults"),
+    ]);
+    setProgress(Object.fromEntries(savedProgress.map((x) => [x.id, x])));
+    setEvents(savedEvents);
+    setResults(savedResults);
+  }, []);
   useEffect(() => {
     migrateLegacyProgress()
-      .then(async () => {
-        const [savedProgress, savedEvents, savedResults] = await Promise.all([
-          getAll("cardProgress"),
-          getAll("studyEvents"),
-          getAll("assessmentResults"),
-        ]);
-        setProgress(Object.fromEntries(savedProgress.map((x) => [x.id, x])));
-        setEvents(savedEvents);
-        setResults(savedResults);
-      })
+      .then(load)
       .finally(() => setReady(true));
-  }, []);
+    window.addEventListener(REMOTE_APPLIED_EVENT, load);
+    return () => window.removeEventListener(REMOTE_APPLIED_EVENT, load);
+  }, [load]);
   async function rate(item, rating, detail = {}) {
     const record = {
       id: item.id,
@@ -212,7 +223,7 @@ function useLearningStore() {
   };
 }
 
-function Header({ view, setView, completed, menuOpen, setMenuOpen, cloud }) {
+function Header({ view, setView, completed, menuOpen, setMenuOpen, drive }) {
   return (
     <>
       <header className="topbar">
@@ -231,12 +242,12 @@ function Header({ view, setView, completed, menuOpen, setMenuOpen, cloud }) {
           ))}
         </nav>
         <button
-          className={`account-chip ${cloud.status}`}
+          className={`account-chip ${drive.status}`}
           onClick={() => setView("settings")}
-          title={cloud.user?.email || "登入後可跨裝置同步"}
+          title="使用 Google 雲端硬碟同步"
         >
           <i />
-          {cloud.user ? "已登入" : "登入"}
+          {drive.connected ? "硬碟已連結" : "雲端硬碟"}
         </button>
         <div className="header-progress">
           <strong>{completed}</strong>
@@ -1236,7 +1247,7 @@ function ProgressView({ data, activePeriod, store, pageState, updatePage }) {
   );
 }
 
-function SettingsView({ settings, setSettings, onRestored, cloud }) {
+function SettingsView({ settings, setSettings, onRestored, drive }) {
   const [voices, setVoices] = useState([]);
   const [preview, setPreview] = useState(null);
   const fileRef = useRef();
@@ -1269,7 +1280,7 @@ function SettingsView({ settings, setSettings, onRestored, cloud }) {
     }
   }
   async function restore() {
-    await restoreSnapshot(preview, { forceCloud: true });
+    await restoreSnapshot(preview, { forceDrive: true });
     setPreview(null);
     onRestored();
   }
@@ -1278,10 +1289,10 @@ function SettingsView({ settings, setSettings, onRestored, cloud }) {
       <PageTitle
         eyebrow="SETTINGS"
         title="設定與資料"
-        text="登入後自動同步手機與電腦，離線時仍會保存在本機。"
+        text="連結 Google 雲端硬碟後同步手機與電腦；離線時仍保存在本機。"
       />
       <div className="settings-grid">
-        <AuthPanel cloud={cloud} />
+        <DriveSyncPanel drive={drive} />
         <article>
           <h3>日語語音</h3>
           <label>
@@ -1433,7 +1444,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const cloud = useCloudAccount();
+  const drive = useGoogleDriveSync();
   const now = currentRocPeriod();
   const defaultPeriod = PERIODS.includes(now) ? now : PERIODS[0];
   const {
@@ -1445,6 +1456,12 @@ export default function App() {
   } = useUiSession(defaultPeriod);
   const [settings, setSettings] = useState({ rate: 0.85, voiceURI: "" });
   const [settingsReady, setSettingsReady] = useState(false);
+  const updateSettings = useCallback((updater) => {
+    setSettings((current) => {
+      const next = typeof updater === "function" ? updater(current) : updater;
+      return { ...next, updatedAt: new Date().toISOString() };
+    });
+  }, []);
   const store = useLearningStore();
   const pageActions = useMemo(
     () =>
@@ -1465,18 +1482,22 @@ export default function App() {
       .finally(() => setLoading(false));
   }, []);
   useEffect(() => {
-    getAll("settings")
-      .then((xs) => {
-        const saved = xs.find((x) => x.id === "tts")?.value;
-        if (saved) setSettings(saved);
-      })
-      .finally(() => setSettingsReady(true));
+    const load = () =>
+      getAll("settings")
+        .then((xs) => {
+          const saved = xs.find((x) => x.id === "tts")?.value;
+          if (saved) setSettings(saved);
+        })
+        .finally(() => setSettingsReady(true));
+    void load();
+    window.addEventListener(REMOTE_APPLIED_EVENT, load);
+    return () => window.removeEventListener(REMOTE_APPLIED_EVENT, load);
   }, []);
   useEffect(() => {
     if (settingsReady)
       void put("settings", {
         id: "tts",
-        value: { ...settings, updatedAt: new Date().toISOString() },
+        value: settings,
       });
   }, [settings, settingsReady]);
   useEffect(() => {
@@ -1486,17 +1507,11 @@ export default function App() {
     );
     return () => cancelAnimationFrame(frame);
   }, [sessionReady, view]);
-  if (
-    loading ||
-    !sessionReady ||
-    !settingsReady ||
-    !store.ready ||
-    !cloud.authReady
-  )
+  if (loading || !sessionReady || !settingsReady || !store.ready)
     return (
       <div className="loading-screen">
         <b>日語階梯</b>
-        <span>正在恢復教材、帳號與學習進度…</span>
+        <span>正在恢復教材與學習進度…</span>
       </div>
     );
   if (error)
@@ -1515,7 +1530,7 @@ export default function App() {
         completed={completed}
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
-        cloud={cloud}
+        drive={drive}
       />
       <div className="app-body">
         <PeriodRail
@@ -1585,11 +1600,11 @@ export default function App() {
           {view === "settings" && (
             <SettingsView
               settings={settings}
-              setSettings={setSettings}
-              cloud={cloud}
+              setSettings={updateSettings}
+              drive={drive}
               onRestored={() => {
                 localStorage.removeItem("nihongo-stairs-ui-session");
-                store.reload();
+                notifyRemoteApplied();
               }}
             />
           )}

@@ -57,10 +57,3 @@ export function snapshotsEqual(left, right) {
     JSON.stringify(normalizeSnapshot(right))
   );
 }
-
-export function dataOwnerTransition(currentOwner, nextUserId) {
-  return {
-    clearLocal: Boolean(currentOwner && currentOwner !== nextUserId),
-    owner: nextUserId,
-  };
-}

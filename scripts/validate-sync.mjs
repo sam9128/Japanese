@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import {
-  dataOwnerTransition,
   mergeSnapshots,
   normalizeSnapshot,
   snapshotsEqual,
 } from "../src/syncData.js";
-import { runSnapshotSync } from "../src/syncEngine.js";
+import {
+  DRIVE_SYNC_VERSION,
+  isDriveEnvelope,
+  runDriveSnapshotSync,
+} from "../src/syncEngine.js";
 
 const local = normalizeSnapshot({
   cardProgress: [
@@ -16,17 +19,17 @@ const local = normalizeSnapshot({
     { id: "tts", value: { rate: 0.85, updatedAt: "2026-07-03T10:00:00Z" } },
   ],
 });
-const cloud = normalizeSnapshot({
+const mobile = normalizeSnapshot({
   cardProgress: [
     { id: "a", rating: "hard", updatedAt: "2026-07-03T09:00:00Z" },
     { id: "b", rating: "easy", updatedAt: "2026-07-03T09:00:00Z" },
   ],
-  studyEvents: [{ id: "cloud-event", occurredAt: "2026-07-03T09:00:00Z" }],
+  studyEvents: [{ id: "mobile-event", occurredAt: "2026-07-03T09:00:00Z" }],
   settings: [
     { id: "tts", value: { rate: 1, updatedAt: "2026-07-03T11:00:00Z" } },
   ],
 });
-const merged = mergeSnapshots(local, cloud);
+const merged = mergeSnapshots(local, mobile);
 
 assert.equal(merged.cardProgress.length, 2, "不同裝置的卡片進度必須保留");
 assert.equal(
@@ -46,104 +49,130 @@ assert.equal(
   "正規化後內容應穩定",
 );
 
-function fakeAdapter(initialRow, { concurrentSnapshot = null } = {}) {
-  let row = initialRow
-    ? { ...initialRow, payload: normalizeSnapshot(initialRow.payload) }
-    : null;
-  let racePending = Boolean(concurrentSnapshot);
-  let writes = 0;
+function envelope(deviceId, snapshot, updatedAt) {
+  return { syncVersion: DRIVE_SYNC_VERSION, deviceId, updatedAt, snapshot };
+}
+
+function fakeDrive(initialFiles) {
+  let sequence = initialFiles.length + 1;
+  const files = initialFiles.map((file) => structuredClone(file));
+  let uploads = 0;
   let deletes = 0;
   return {
     adapter: {
-      async deleteSnapshot() {
-        row = null;
-        deletes += 1;
+      async listSnapshots() {
+        return files.map(({ envelope: _ignored, ...file }) =>
+          structuredClone(file),
+        );
       },
-      async readSnapshot() {
-        return row ? structuredClone(row) : null;
+      async downloadSnapshot(file) {
+        const found = files.find((item) => item.id === file.id);
+        if (found?.corrupted) throw new Error("Malformed JSON");
+        return structuredClone(found?.envelope);
       },
-      async writeSnapshot({ expectedRevision, payload }) {
-        writes += 1;
-        if (racePending) {
-          racePending = false;
-          row = {
-            payload: mergeSnapshots(row.payload, concurrentSnapshot),
-            revision: row.revision + 1,
-            updatedAt: "2026-07-03T12:00:00Z",
-          };
+      async deleteSnapshots(targets) {
+        for (const target of targets) {
+          const index = files.findIndex((item) => item.id === target.id);
+          if (index >= 0) files.splice(index, 1);
         }
-        if (row && row.revision !== expectedRevision) {
-          return { applied: false, ...structuredClone(row) };
+        deletes += targets.length;
+      },
+      async upsertDeviceSnapshot({ deviceId, existingFile, envelope: next }) {
+        uploads += 1;
+        const found = files.find((item) => item.id === existingFile?.id);
+        if (found) {
+          found.envelope = structuredClone(next);
+          found.modifiedTime = next.updatedAt;
+          return;
         }
-        row = {
-          payload: normalizeSnapshot(payload),
-          revision: (row?.revision || 0) + 1,
-          updatedAt: "2026-07-03T13:00:00Z",
-        };
-        return { applied: true, ...structuredClone(row) };
+        files.push({
+          id: `file-${sequence++}`,
+          name: `nihongo-stairs-sync-${deviceId}.json`,
+          modifiedTime: next.updatedAt,
+          envelope: structuredClone(next),
+        });
       },
     },
-    state: () => ({ row, writes, deletes }),
+    state: () => ({ files, uploads, deletes }),
   };
 }
 
-const concurrent = normalizeSnapshot({
-  studyEvents: [{ id: "concurrent-event", occurredAt: "2026-07-03T12:00:00Z" }],
-});
-const racedServer = fakeAdapter(
-  { payload: cloud, revision: 1, updatedAt: "2026-07-03T09:00:00Z" },
-  { concurrentSnapshot: concurrent },
-);
-let savedAfterRace = local;
-const raceResult = await runSnapshotSync({
-  adapter: racedServer.adapter,
-  userId: "user-a",
+const drive = fakeDrive([
+  {
+    id: "mobile-file",
+    name: "nihongo-stairs-sync-mobile.json",
+    modifiedTime: "2026-07-03T09:00:00Z",
+    envelope: envelope("mobile", mobile, "2026-07-03T09:00:00Z"),
+  },
+  {
+    id: "old-desktop-file",
+    name: "nihongo-stairs-sync-desktop.json",
+    modifiedTime: "2026-07-02T09:00:00Z",
+    envelope: envelope("desktop", {}, "2026-07-02T09:00:00Z"),
+  },
+  {
+    id: "new-desktop-file",
+    name: "nihongo-stairs-sync-desktop.json",
+    modifiedTime: "2026-07-03T08:00:00Z",
+    envelope: envelope("desktop", local, "2026-07-03T08:00:00Z"),
+  },
+  {
+    id: "corrupted-file",
+    name: "nihongo-stairs-sync-corrupted.json",
+    modifiedTime: "2026-07-03T08:30:00Z",
+    corrupted: true,
+  },
+]);
+let applied = local;
+const result = await runDriveSnapshotSync({
+  adapter: drive.adapter,
+  deviceId: "desktop",
   loadLocal: async () => local,
   saveLocal: async (snapshot) => {
-    savedAfterRace = snapshot;
+    applied = snapshot;
   },
 });
-assert.equal(raceResult.localChanged, true, "雲端內容應合併回本機");
+assert.equal(result.localChanged, true, "Google Drive 新資料應套用到本機");
+assert.equal(applied.studyEvents.length, 2, "手機與電腦事件都必須保留");
+assert.equal(drive.state().uploads, 1, "本裝置快照過期時應更新一次");
+assert.equal(drive.state().deletes, 1, "同裝置重複舊檔應清除");
 assert.equal(
-  savedAfterRace.studyEvents.length,
-  3,
-  "版本衝突重試後仍須保留兩裝置與競態中的事件",
+  drive.state().files.find((file) => file.id === "new-desktop-file").envelope
+    .snapshot.studyEvents.length,
+  2,
+  "更新後的本裝置檔案應包含合併結果",
 );
-assert.equal(
-  racedServer.state().row.payload.studyEvents.length,
-  3,
-  "競態重試後雲端不得遺失事件",
-);
-assert.equal(racedServer.state().writes, 2, "版本衝突應自動重試一次");
 
-const forceServer = fakeAdapter({
-  payload: cloud,
-  revision: 5,
-  updatedAt: "2026-07-03T09:00:00Z",
-});
-await runSnapshotSync({
-  adapter: forceServer.adapter,
-  userId: "user-a",
+const forceDrive = fakeDrive([
+  {
+    id: "mobile-file",
+    name: "nihongo-stairs-sync-mobile.json",
+    modifiedTime: "2026-07-03T09:00:00Z",
+    envelope: envelope("mobile", mobile, "2026-07-03T09:00:00Z"),
+  },
+]);
+await runDriveSnapshotSync({
+  adapter: forceDrive.adapter,
+  deviceId: "desktop",
   loadLocal: async () => local,
   saveLocal: async () => {},
   force: true,
 });
-assert.equal(forceServer.state().deletes, 1, "備份還原應先移除舊雲端快照");
+assert.equal(forceDrive.state().deletes, 1, "強制還原應刪除舊裝置快照");
+assert.equal(forceDrive.state().files.length, 1, "強制還原後只保留新快照");
 assert.equal(
-  forceServer.state().row.payload.studyEvents.length,
+  forceDrive.state().files[0].envelope.snapshot.studyEvents.length,
   1,
-  "強制還原不得把舊雲端事件重新混入",
+  "強制還原不得重新混入舊雲端事件",
 );
 
-assert.deepEqual(dataOwnerTransition(null, "user-a"), {
-  clearLocal: false,
-  owner: "user-a",
-});
-assert.deepEqual(dataOwnerTransition("user-a", "user-b"), {
-  clearLocal: true,
-  owner: "user-b",
-});
+assert.equal(isDriveEnvelope(null), false);
+assert.equal(isDriveEnvelope({ syncVersion: 99 }), false);
+assert.equal(
+  isDriveEnvelope(envelope("desktop", local, "2026-07-03T10:00:00Z")),
+  true,
+);
 
 console.log(
-  "Cloud snapshot merge, conflict retry, restore, and owner isolation validation passed.",
+  "Google Drive snapshot merge, duplicate cleanup, malformed file, and restore validation passed.",
 );

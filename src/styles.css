@@ -833,25 +833,42 @@ a {
   background: var(--red);
 }
 @keyframes pulse {
-  50% { opacity: 0.35; }
+  50% {
+    opacity: 0.35;
+  }
 }
-.cloud-card { grid-column: 1 / -1; }
-.account-email { font-weight: 700; word-break: break-all; }
-.sync-state { display: flex; align-items: center; gap: 8px; margin: 12px 0; color: #5d6d63; }
-.cloud-card small { display: block; color: #748078; }
-.cloud-actions { margin-top: 15px; }
-.privacy-note { font-size: 12px; color: #6f7c73; line-height: 1.7; }
-.auth-tabs { display: flex; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
-.auth-tabs button { border: 0 !important; border-bottom: 2px solid transparent !important; background: none !important; color: #6d786f !important; margin: 0 !important; }
-.auth-tabs button.active { border-bottom-color: var(--green) !important; color: var(--green) !important; font-weight: 700; }
-.auth-form { max-width: 520px; }
-.auth-form label { font-size: 12px; }
-.auth-form input { display: block; width: 100%; margin-top: 6px; border: 1px solid var(--line); padding: 11px 12px; background: #fff; }
-.text-action { border: 0 !important; padding: 4px !important; margin-top: 8px !important; }
-.form-message,
-.form-error { padding: 11px 13px; background: #fff4dc; color: #765822; font-size: 13px; }
-.form-error { background: #f8ecea; color: #8a3e35; }
-.cloud-card code { font-size: 11px; }
+.drive-card {
+  grid-column: 1 / -1;
+}
+.sync-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  color: #5d6d63;
+}
+.drive-card small {
+  display: block;
+  color: #748078;
+}
+.drive-actions {
+  margin-top: 15px;
+}
+.privacy-note {
+  font-size: 12px;
+  color: #6f7c73;
+  line-height: 1.7;
+}
+.form-error {
+  padding: 11px 13px;
+  background: #fff4dc;
+  color: #765822;
+  font-size: 13px;
+}
+.form-error {
+  background: #f8ecea;
+  color: #8a3e35;
+}
 @media (max-width: 1050px) {
   .topbar nav button {
     padding: 0 9px;
@@ -1287,7 +1304,16 @@ body {
   }
 }
 @media (max-width: 700px) {
-  .account-chip { margin-left: auto; margin-right: 4px; padding: 6px 9px; }
-  .hamburger { margin-left: 4px; }
-  .cloud-actions button { width: 100%; margin: 5px 0; }
+  .account-chip {
+    margin-left: auto;
+    margin-right: 4px;
+    padding: 6px 9px;
+  }
+  .hamburger {
+    margin-left: 4px;
+  }
+  .drive-actions button {
+    width: 100%;
+    margin: 5px 0;
+  }
 }

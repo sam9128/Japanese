@@ -1,15 +1,15 @@
 # 日語階梯
 
-N3 → N2 年度離線學習 PWA。未登入時資料保存在 IndexedDB；登入後可透過 Supabase 在手機與電腦間同步。
+N3 → N2 年度離線學習 PWA。資料先保存在 IndexedDB；使用者可自行授權 Google 雲端硬碟，在手機與電腦間同步。
 
-## 帳號與跨裝置同步
+## Google 雲端硬碟同步
 
-1. 在 Supabase 建立專案，於 SQL Editor 執行 `supabase/schema.sql`。
-2. 複製 `.env.example` 為 `.env.local`，填入 Project URL 與 Publishable Key。
-3. GitHub Pages 部署時建立 Repository variable `VITE_SUPABASE_URL`，以及 Repository secret `VITE_SUPABASE_PUBLISHABLE_KEY`。
-4. Supabase Authentication → URL Configuration 的 Site URL 與 Redirect URLs 加入 `https://sam9128.github.io/Japanese/`。
+1. 在 Google Cloud 建立專案並啟用 Google Drive API。
+2. 設定 OAuth 同意畫面；若維持測試模式，將使用者加入 Test users。
+3. 建立「Web application」OAuth Client ID，Authorized JavaScript origins 加入 `http://localhost:5173` 與 `https://sam9128.github.io`。
+4. 複製 `.env.example` 為 `.env.local` 並填入 Client ID；GitHub Pages 則建立 Repository variable `VITE_GOOGLE_CLIENT_ID`。
 
-前端只使用可公開的 Publishable Key；請勿放入 `service_role` key。每位使用者的資料由 PostgreSQL RLS 依 `auth.uid()` 隔離。
+網站採 Google Identity Services token model，只要求 `drive.appdata` 權限。備份位於使用者 Drive 的隱藏 `appDataFolder`；access token 僅存在記憶體，不寫入 IndexedDB、localStorage 或備份。OAuth Client ID 可公開，請勿加入 Client Secret。
 
 ## 本機執行
 
