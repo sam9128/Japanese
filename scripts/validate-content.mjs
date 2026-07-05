@@ -30,11 +30,26 @@ for(const card of all.grammar){
   if(card.audioText!==expectedAudio)throw new Error(`grammar audio does not match pattern: ${card.id}`);
   if(card.audioText===card.examples[0].ja)throw new Error(`grammar pattern audio duplicates example: ${card.id}`);
 }
+for(const card of all.vocabulary){
+  if(!card.sourceRefs.includes(`https://www.sigure.tw/learn-japanese/vocabulary/${card.level.toLowerCase()}/`))throw new Error(`missing Sigure vocabulary reference: ${card.id}`);
+  if(!card.referenceNoteZh?.includes("不轉載")&&!card.referenceNoteZh?.includes("未轉載"))throw new Error(`missing vocabulary reference disclaimer: ${card.id}`);
+}
+for(const card of all.grammar){
+  if(!card.sourceRefs.includes(`https://www.sigure.tw/learn-japanese/grammar/${card.level.toLowerCase()}/`))throw new Error(`missing Sigure grammar reference: ${card.id}`);
+  if(!card.usageZh?.startsWith("主要接續："))throw new Error(`grammar connection note missing: ${card.id}`);
+  if(!card.referenceNoteZh?.includes("自編"))throw new Error(`missing grammar reference disclaimer: ${card.id}`);
+}
 const hasJapanese=(value)=>/[\u3040-\u30ff\u3400-\u9fff]/.test(value||"");
 const hasChineseMarker=(value)=>/[這裡還讓應該嗎個們]|下午|上午|二樓|選項|答案|中文|直接放棄|身邊的人/.test(value||"");
 const sourceQuestions=new Map();
 const awkwardPatterns=[/するください/,/するもらえ/,/事前に前日まで/,/までに前日まで/,/早めに前日まで/];
 if(new Set(all.reading.map(item=>item.content)).size!==52)throw new Error("reading passages are not all unique");
+if(new Set(all.reading.map(item=>item.headline)).size!==52)throw new Error("news headlines are not all unique");
+for(const item of all.reading){
+  if(!item.newsStyle||!item.newsCategory||!item.newsCategoryJa||!item.headline||!item.dateline)throw new Error(`news metadata missing: ${item.id}`);
+  if(!item.summaryPromptZh||!item.sourceNoteZh?.includes("自編")||!item.sourceNoteZh?.includes("並非"))throw new Error(`news authorship notice missing: ${item.id}`);
+  if(!item.sourceRefs.includes("https://www.sigure.tw/quiz/reading/medium/"))throw new Error(`news reference missing: ${item.id}`);
+}
 if(new Set(all.listening.map(item=>item.audioText)).size!==104)throw new Error("listening scripts are not all unique");
 for(const item of [...all.reading,...all.listening]){
   const sourceText=item.category==="reading"?item.content:item.audioText;

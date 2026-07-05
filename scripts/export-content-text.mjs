@@ -90,7 +90,10 @@ for (const period of periods) {
   add("", `【閱讀教材｜${period.reading.length} 篇】`);
   period.reading.forEach((item, index) => {
     add("", `${index + 1}. ${item.term}（${item.level}／難度 ${item.difficulty}／約 ${item.estimatedMinutes} 分鐘）`);
+    if (item.newsStyle) add(`新聞分類：${item.newsCategory}`, `新聞標題：${item.headline}`, `刊號：${item.dateline}`);
     add(`學習說明：${item.meaningZh}`, "文章：", item.content);
+    if (item.summaryPromptZh) add(`摘要提示：${item.summaryPromptZh}`);
+    if (item.sourceNoteZh) add(`編寫與來源說明：${item.sourceNoteZh}`);
     addQuestions(item.questions);
     addSources(item);
   });

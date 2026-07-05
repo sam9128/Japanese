@@ -34,6 +34,8 @@ pnpm run validate:content
 
 例句繁體中文直譯保存在 `scripts/source/example-translations-zh.json`，網站執行時不會連線翻譯服務。新增例句後可執行 `pnpm run translate:examples` 補齊缺漏，再重新產生與驗證教材；此命令只傳送公開教材例句，不傳送使用者資料。
 
+N3／N2 單字與文法會以時雨之町的公開分類頁交叉校對，但不轉載其受著作權保護的講解、例句與測驗。閱讀教材採 52 篇自編新聞模組，包含分類、標題、導語、摘要提示與理解題。
+
 ## 資料與著作權
 
 完整署名請見 `public/content/ATTRIBUTION.md`。JLPT 官方試題與音檔只提供來源連結，未收錄或轉載。

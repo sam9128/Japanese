@@ -604,6 +604,16 @@ function LibraryView({
         title="教材庫"
         text="搜尋、播放與重練目前已解鎖的教材。"
       />
+      <aside className="reference-panel" role="note">
+        <strong>教材修訂原則</strong>
+        <span>
+          N3／N2 分級、主題與文法接續交叉參考
+          <a href="https://www.sigure.tw/" target="_blank" rel="noreferrer">
+            時雨之町
+          </a>
+          ；中文說明、例句與題目均重新編寫，不轉載原文。
+        </span>
+      </aside>
       <div className="toolbar">
         <input
           value={query}
@@ -789,10 +799,17 @@ function MediaView({
         <article className="media-workspace">
           <div className="media-head">
             <div>
-              <span>
-                {item.level} · {type === "reading" ? "精讀" : "逐句聽解"}
-              </span>
-              <h2>{item.term}</h2>
+              {type === "reading" && item.newsStyle ? (
+                <div className="news-meta">
+                  <span>{item.level} · {item.newsCategory}新聞</span>
+                  <time>{item.dateline}</time>
+                </div>
+              ) : (
+                <span>
+                  {item.level} · {type === "reading" ? "精讀" : "逐句聽解"}
+                </span>
+              )}
+              <h2>{item.headline || item.term}</h2>
             </div>
             <div className="timer">
               {String(Math.floor(elapsed / 60)).padStart(2, "0")}:
@@ -804,9 +821,24 @@ function MediaView({
           </div>
           {type === "reading" ? (
             <div className="reading-copy">
-              {item.content.split("\n").map((p, i) => (
-                <p key={i}>{p}</p>
-              ))}
+              <article className={item.newsStyle ? "news-article" : ""}>
+                {item.content.split("\n").map((p, i) => (
+                  <p key={i}>{p}</p>
+                ))}
+              </article>
+              {item.sourceNoteZh ? (
+                <aside className="source-note">
+                  <strong>編寫說明：</strong>
+                  {item.sourceNoteZh}
+                  {item.sourceRefs
+                    ?.filter((ref) => ref.startsWith("http"))
+                    .map((ref) => (
+                      <a key={ref} href={ref} target="_blank" rel="noreferrer">
+                        參考頁
+                      </a>
+                    ))}
+                </aside>
+              ) : null}
               <textarea
                 value={pageState.summaries?.[item.id] || ""}
                 onChange={(event) =>
@@ -818,7 +850,7 @@ function MediaView({
                     },
                   }))
                 }
-                placeholder="用 2–3 句寫下摘要…"
+                placeholder={item.summaryPromptZh || "用 2–3 句寫下摘要…"}
               />
             </div>
           ) : (

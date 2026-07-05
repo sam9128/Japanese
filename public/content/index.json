@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-03T15:23:07.786Z",
+  "generatedAt": "2026-07-05T15:17:29.439Z",
   "periods": [
     "115-07",
     "115-08",
@@ -95,6 +95,11 @@
       "name": "EDRDG/JMdict",
       "url": "https://www.edrdg.org/",
       "license": "EDRDG licence"
+    },
+    {
+      "name": "時雨之町",
+      "url": "https://www.sigure.tw/",
+      "use": "classification and grammar cross-check only; no copied explanations, examples, articles, or quizzes"
     },
     {
       "name": "JLPT sample questions",

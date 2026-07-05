@@ -13,6 +13,17 @@ const outRoot = path.join(root, "public", "content", "periods");
 const periods = ["115-07", "115-08", "115-09", "115-10", "115-11", "115-12", "116-01", "116-02", "116-03", "116-04", "116-05", "116-06"];
 const vocabCaps = [400, 800, 1200, 1600, 1600, 1600, 2400, 2800, 3200, 3600, 4000, 4000];
 const grammarCaps = [60, 120, 180, 240, 240, 240, 240, 240, 240, 240, 240, 240];
+const sigureRefs = {
+  vocabulary: {
+    N3: "https://www.sigure.tw/learn-japanese/vocabulary/n3/",
+    N2: "https://www.sigure.tw/learn-japanese/vocabulary/n2/",
+  },
+  grammar: {
+    N3: "https://www.sigure.tw/learn-japanese/grammar/n3/",
+    N2: "https://www.sigure.tw/learn-japanese/grammar/n2/",
+  },
+  reading: "https://www.sigure.tw/quiz/reading/medium/",
+};
 const ecdictZh = JSON.parse(fs.readFileSync(path.join(root, "scripts", "source", "ecdict-zh.json"), "utf8"));
 const exampleTranslationsZh = JSON.parse(
   fs.readFileSync(
@@ -136,9 +147,10 @@ function loadWords() {
     const exampleJa = item.example_sentence_native || `${item.word}について勉強します。`;
     const exampleZh = exampleTranslationsZh[exampleJa];
     if (!exampleZh) throw new Error(`例句缺少中文翻譯：${exampleJa}`);
+    const level = index < 1600 ? "N3" : "N2";
     return ({
     id: `vocab-${String(index + 1).padStart(4, "0")}`,
-    level: index < 1600 ? "N3" : "N2",
+    level,
     category: "vocab",
     term: item.word,
     reading: /[\u3040-\u30ff]/.test(item.word) && !/[\u4e00-\u9faf]/.test(item.word) ? item.word : romajiToKana(item.romanization),
@@ -150,7 +162,8 @@ function loadWords() {
     audioText: item.word,
     unlockPeriod: periodFor(index, vocabCaps),
     tags: [item.pos || "word", item.cefr_level || "Unknown"],
-    sourceRefs: ["https://github.com/vbvss199/Language-Learning-decks", "https://www.edrdg.org/", "https://github.com/skywind3000/ECDICT"],
+    sourceRefs: ["https://github.com/vbvss199/Language-Learning-decks", "https://www.edrdg.org/", "https://github.com/skywind3000/ECDICT", sigureRefs.vocabulary[level]],
+    referenceNoteZh: `分級與主題分類交叉參考時雨之町 ${level} 單字索引；中文解釋與例句未轉載，依開放資料重新編寫。`,
     license: "Language-Learning-decks MIT; frequency data CC BY-SA 4.0; EDRDG/JMdict attribution retained; Chinese glosses derived with ECDICT (MIT)"
   });
   });
@@ -175,7 +188,21 @@ function explainGrammar(term) {
 }
 
 function grammarUsageZh(term) {
-  return `接續提示：先辨認「${term}」前面接名詞、動詞普通形或其他形式，再判斷它在句中表示條件、原因、時間、程度或說話者態度。`;
+  const pattern = term.replaceAll("〜", "").replace(/[（(].*?[）)]/g, "");
+  let connection = "普通形（名詞／形容詞／動詞的接法依句型調整）";
+  if (/^(うちに|間に?|最中|際に)/.test(pattern)) connection = "名詞＋の／動詞普通形；な形容詞＋な；い形容詞普通形";
+  else if (/^(ところだ|たところだ|ているところだ)/.test(pattern)) connection = "動詞辭書形／た形／ている形；時態不同會改變『正要、正在、剛做完』";
+  else if (/^(ばかりだ|たばかり)/.test(pattern)) connection = "動詞辭書形或た形；依句型判斷『持續變化』或『剛做完』";
+  else if (/^(ようとする|ようになる|ようにする|ようにしている)/.test(pattern)) connection = "動詞意向形或辭書形／ない形＋ように";
+  else if (/^(ことになる|ことにする|ことになっている|ことにしている)/.test(pattern)) connection = "動詞辭書形／ない形＋こと；注意客觀決定與主動決定的差別";
+  else if (/^(つつ|つつある)/.test(pattern)) connection = "動詞ます形去掉「ます」＋つつ（ある）";
+  else if (/^(て|でも|ても|ては|てこそ)/.test(pattern)) connection = "動詞て形";
+  else if (/^(ない|ず|ぬ|ざる)/.test(pattern)) connection = "動詞ない形；「ず／ぬ／ざる」使用書面否定形";
+  else if (/^(た|て以来|てから)/.test(pattern)) connection = "動詞た形或て形，依時間先後判斷";
+  else if (/^(ば|なら|たら|と)$|さえ.*ば|ば.*ほど/.test(pattern)) connection = "條件形（ば／たら／なら／と）";
+  else if (/(について|に関して|に対して|にとって|において|をめぐって|に基づいて|に応じて|に比べて|に加えて|に反して|にかわって|に沿って|につれて|にしたがって|にともなって|に限って|に限らず|にわたって)/.test(pattern)) connection = "名詞＋助詞句";
+  else if (/(こと|もの|わけ|はず|べき|よう|そう|らしい|みたい)/.test(pattern)) connection = "動詞／形容詞普通形；名詞與な形容詞須注意「だ／な／の」變化";
+  return `主要接續：${connection}。判讀時先找出前項詞性，再確認後項是在表達時間、原因、條件、範圍、推測或說話者態度；例句與句型一起朗讀記憶。`;
 }
 function grammarAudioText(term) {
   return term.replace(/[〜～]/g, "").replace(/[（(][^）)]*[）)]/g, "").trim();
@@ -189,12 +216,15 @@ function makeGrammar() {
     const exampleJa = grammarExamples.get(term);
     const exampleZh = exampleTranslationsZh[exampleJa];
     if (!exampleZh) throw new Error(`例句缺少中文翻譯：${exampleJa}`);
+    const level = index < 180 ? "N3" : "N2";
     return {
-      id: `grammar-${String(index + 1).padStart(3, "0")}`, level: index < 180 ? "N3" : "N2", category: "grammar", term,
+      id: `grammar-${String(index + 1).padStart(3, "0")}`, level, category: "grammar", term,
       reading: "文法句型", meaningZh: explainGrammar(term), usageZh: grammarUsageZh(term),
       examples: [{ ja: exampleJa, zh: exampleZh, explanationZh: `這句使用「${term}」。${explainGrammar(term)}` }],
       audioText: grammarAudioText(term), unlockPeriod: periodFor(index, grammarCaps),
-      tags: [index < 180 ? "N3文法" : "N2文法"], sourceRefs: ["self-authored"], license: "CC BY 4.0 — 本計畫自編"
+      tags: [`${level}文法`], sourceRefs: ["self-authored", sigureRefs.grammar[level]],
+      referenceNoteZh: `句型分級與接續觀念交叉參考時雨之町 ${level} 文法索引；解釋、例句與題目均為本計畫自編。`,
+      license: "CC BY 4.0 — 本計畫自編"
     };
   });
 }
@@ -222,36 +252,71 @@ function makeReading(index) {
   const scenarioIndex = index % assessmentScenarios.length;
   const variant = Math.floor(index / assessmentScenarios.length);
   const s = assessmentScenarios[scenarioIndex];
+  const categories = [
+    ["交通", "交通"], ["生活", "生活"], ["教育", "教育"], ["工作", "仕事"],
+    ["氣象", "気象"], ["健康", "健康"], ["旅遊", "観光"], ["居住", "住宅"],
+    ["消費", "消費"], ["文化", "文化"], ["圖書", "図書"], ["經濟", "経済"], ["環境", "環境"],
+  ];
+  const [newsCategory, newsCategoryJa] = categories[scenarioIndex];
+  const dateline = `學習新聞・第 ${String(index + 1).padStart(2, "0")} 號`;
+  let headline;
   let content;
   let questions;
   if (variant === 0) {
-    content = `【${s.event}についてのお知らせ】\n${s.reason}ため、${s.event}は${s.oldTime}・${s.oldPlace}から、${s.newTime}・${s.newPlace}に変更します。参加する人は${s.item}を持ち、開始の十分前までに集まってください。質問がある場合は、${s.contact}へ連絡してください。`;
+    headline = `${s.event}、時間と場所を変更`;
+    content = `【${newsCategoryJa}ニュース】\n${s.event}は、${s.reason}ため、予定していた${s.oldTime}の${s.oldPlace}から、${s.newTime}の${s.newPlace}へ変更されることになりました。主催者は、参加者に${s.item}を持参し、開始の十分前までに集まるよう呼びかけています。詳しい情報については、${s.contact}に確認してください。`;
     questions = [
-      makeQuestion("参加する人は、いつ、どこへ行きますか。", `${s.newTime}に${s.newPlace}へ行く。`, [`${s.oldTime}に${s.oldPlace}へ行く。`,`${s.newTime}に${s.oldPlace}へ行く。`,`${s.oldTime}に${s.newPlace}へ行く。`], index, `文章指出變更後應在「${s.newTime}」前往「${s.newPlace}」。`, `${s.newTime}・${s.newPlace}`),
-      makeQuestion("参加する人が持っていくものは何ですか。", s.item, scenarioValues(scenarioIndex,"item"), index+1, `通知要求參加者攜帶「${s.item}」。`)
+      makeQuestion("参加する人は、いつ、どこへ行きますか。", `${s.newTime}に${s.newPlace}へ行く。`, [`${s.oldTime}に${s.oldPlace}へ行く。`,`${s.newTime}に${s.oldPlace}へ行く。`,`${s.oldTime}に${s.newPlace}へ行く。`], index, `文章指出變更後應在「${s.newTime}」前往「${s.newPlace}」。`, s.newTime),
+      makeQuestion("主催者は、参加者に何を持ってくるよう呼びかけていますか。", s.item, scenarioValues(scenarioIndex,"item"), index+1, `新聞導語指出主辦方要求參加者攜帶「${s.item}」。`)
     ];
   } else if (variant === 1) {
-    content = `件名：${s.event}の準備について\n${s.actor}です。${s.event}を予定どおり進めるため、「${s.action}」という準備を${s.deadline}までに終えてください。終わった人は${s.contact}へ連絡してください。当日は${s.item}も忘れずに持ってきてください。${s.reason}ため、直前にもう一度予定を確認する必要があります。`;
+    headline = `${s.event}、事前の準備を呼びかけ`;
+    content = `【${newsCategoryJa}ニュース】\n${s.event}を予定どおり進めるため、担当の${s.actor}は参加者に「${s.action}」という準備を${s.deadline}までに終えるよう求めました。準備が終わった人は${s.contact}へ連絡し、当日は${s.item}を持参します。${s.reason}ため、担当者は直前にも最新の予定を確認してほしいと話しています。`;
     questions = [
       makeQuestion("参加する人が最初にしなければならないことは何ですか。", `${s.action}。`, scenarioValues(scenarioIndex,"action").map(value=>`${value}。`), index, `郵件要求先「${s.action}」。`, s.action),
       makeQuestion("準備が終わった後、どうしますか。", `${s.contact}へ連絡する。`, scenarioValues(scenarioIndex,"contact").map(value=>`${value}へ連絡する。`), index+1, `準備完成後要聯絡「${s.contact}」。`, s.contact)
     ];
   } else if (variant === 2) {
-    content = `私は、${s.event}をうまく進めるには、「${s.action}」という準備を事前に行うことが大切だと思います。以前は準備を当日まで延ばしてしまい、必要な情報を確認できませんでした。そこで、今回は早めに準備を始めました。その結果、${s.result}。${s.reason}場合でも、前もって確認しておけば落ち着いて対応できます。`;
+    headline = `早めの準備で「${s.result}」`;
+    content = `【${newsCategoryJa}レポート】\n${s.event}の担当者は、今回は「${s.action}」という準備を早い段階から始めました。以前は準備を当日まで延ばし、必要な情報を十分に確認できなかったということです。事前の確認を増やした結果、${s.result}。担当者は、${s.reason}場合でも、前もって確認すれば落ち着いて対応できると説明しています。`;
     questions = [
       makeQuestion("早めに準備した結果、どうなりましたか。", `${s.result}。`, scenarioValues(scenarioIndex,"result").map(value=>`${value}。`), index, `作者提到提早準備後「${s.result}」。`),
       makeQuestion("筆者が最も伝えたいことは何ですか。", `「${s.action}」という準備を事前に行うことが大切だ。`, [`準備は当日になってから始めればよい。`,`予定が変わったときは何もしないほうがよい。`,`必要な情報はほかの人だけに確認してもらえばよい。`], index+1, `作者的主張是事前「${s.action}」很重要。`, s.action)
     ];
   } else {
-    content = `【${s.event} 参加案内】\n申込：${s.deadline}までに${s.contact}へ連絡してください。\n集合：${s.newTime}、${s.newPlace}\n持ち物：${s.item}\n準備：参加前に「${s.action}」という準備を済ませること。\n注意：${s.reason}場合は、集合時刻や場所を変更することがあります。変更は申込者にメールで知らせます。`;
+    headline = `${s.event}、参加方法を発表`;
+    content = `【${newsCategoryJa}案内】\n${s.event}の参加方法が発表されました。申し込みは${s.deadline}までに${s.contact}へ連絡します。集合は${s.newTime}に${s.newPlace}です。参加者は${s.item}を持参し、事前に「${s.action}」という準備を済ませる必要があります。${s.reason}場合は時刻や場所が変わる可能性があり、変更は申込者へメールで通知されます。`;
     questions = [
       makeQuestion("参加を申し込むには、どうすればいいですか。", `${s.deadline}までに${s.contact}へ連絡する。`, [`${s.newTime}に${s.contact}へ行く。`,`${s.deadline}までに${s.newPlace}へ行く。`,`${s.oldTime}にメールを待つ。`], index, `報名方式是在「${s.deadline}」前聯絡「${s.contact}」。`, s.deadline),
-      makeQuestion("案内の内容と合っているものはどれですか。", `参加する前に「${s.action}」という準備を済ませる必要がある。`, [`持ち物は何も必要ない。`,`変更があっても連絡は来ない。`,`集合場所は必ず${s.oldPlace}である。`], index+1, `指南明確要求參加前先「${s.action}」。`, s.action)
+      makeQuestion("記事の内容と合っているものはどれですか。", `参加する前に「${s.action}」という準備を済ませる必要がある。`, [`持ち物は何も必要ない。`,`変更があっても連絡は来ない。`,`集合場所は必ず${s.oldPlace}である。`], index+1, `新聞模組明確指出參加前須先「${s.action}」。`, s.action)
     ];
   }
   const id=`reading-${String(index+1).padStart(2,"0")}`;
   questions=questions.map((question,questionIndex)=>({...question,id:`${id}-q${questionIndex+1}`}));
-  return { id, level:index < 32 ? "N3":"N2", category:"reading", term:`閱讀 ${index+1}｜${s.theme}`, reading:"精讀與摘要", meaningZh:"先計時閱讀，再完成摘要與理解題。", audioText:"", unlockPeriod:periods[Math.min(11, Math.floor(index/5))], tags:[s.theme], sourceRefs:["self-authored"], license:"CC BY 4.0 — 本計畫自編", estimatedMinutes:8+(index%5), difficulty:1+(index%5), content, questions };
+  return {
+    id,
+    level:index < 32 ? "N3":"N2",
+    category:"reading",
+    term:`${newsCategory}新聞｜${headline}`,
+    reading:"新聞精讀與摘要",
+    meaningZh:"先讀標題與導語掌握人物、事件、時間與變化，再完成摘要與理解題。",
+    audioText:"",
+    unlockPeriod:periods[Math.min(11, Math.floor(index/5))],
+    tags:[s.theme, newsCategory, "新聞讀解"],
+    sourceRefs:["self-authored", sigureRefs.reading],
+    sourceNoteZh:"參考時雨之町閱讀測驗的分級概念設計呈現方式；本文、標題、選項與解析均為本計畫自編，並非新聞或網站文章轉載。",
+    license:"CC BY 4.0 — 本計畫自編",
+    estimatedMinutes:8+(index%5),
+    difficulty:1+(index%5),
+    newsStyle:true,
+    newsCategory,
+    newsCategoryJa,
+    headline,
+    dateline,
+    summaryPromptZh:"請用 2–3 句寫出：發生什麼事、原因或變化、讀者需要採取的行動。",
+    content,
+    questions
+  };
 }
 
 function makeListening(index) {
@@ -481,7 +546,7 @@ function auditGeneratedQuestions() {
 
 const questionAudit=auditGeneratedQuestions();
 
-const index = { generatedAt:new Date().toISOString(), periods, counts:{vocabulary:vocabulary.length,grammar:grammar.length,reading:reading.length,listening:listening.length,monthlyChecks:12,n3Mocks:5,n2Mocks:2}, unlockSchedule:periods.map((period,i)=>({period,vocabulary:vocabCaps[i],grammar:grammarCaps[i]})), sources:[{name:"Language-Learning-decks",url:"https://github.com/vbvss199/Language-Learning-decks",license:"MIT / CC BY-SA 4.0 frequency data"},{name:"EDRDG/JMdict",url:"https://www.edrdg.org/",license:"EDRDG licence"},{name:"JLPT sample questions",url:"https://www.jlpt.jp/e/samples/sampleindex.html",use:"link only"}] };
+const index = { generatedAt:new Date().toISOString(), periods, counts:{vocabulary:vocabulary.length,grammar:grammar.length,reading:reading.length,listening:listening.length,monthlyChecks:12,n3Mocks:5,n2Mocks:2}, unlockSchedule:periods.map((period,i)=>({period,vocabulary:vocabCaps[i],grammar:grammarCaps[i]})), sources:[{name:"Language-Learning-decks",url:"https://github.com/vbvss199/Language-Learning-decks",license:"MIT / CC BY-SA 4.0 frequency data"},{name:"EDRDG/JMdict",url:"https://www.edrdg.org/",license:"EDRDG licence"},{name:"時雨之町",url:"https://www.sigure.tw/",use:"classification and grammar cross-check only; no copied explanations, examples, articles, or quizzes"},{name:"JLPT sample questions",url:"https://www.jlpt.jp/e/samples/sampleindex.html",use:"link only"}] };
 if (!dryRun) {
   fs.mkdirSync(outRoot,{recursive:true});
   for (const period of periods) {
