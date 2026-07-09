@@ -1,0 +1,60 @@
+import { createRequire } from "node:module";
+import path from "node:path";
+const require=createRequire(new URL("../學習網站/package.json",import.meta.url));
+const { chromium }=require("playwright-core");
+const browser=await chromium.launch({headless:true,executablePath:"C:/Program Files/Google/Chrome/Application/chrome.exe"});
+const results={errors:[],failedRequests:[],checks:{}};
+
+async function open(viewport){
+  const context=await browser.newContext({viewport});
+  const page=await context.newPage();
+  page.on("console",msg=>{if(msg.type()==="error")results.errors.push(msg.text())});
+  page.on("pageerror",error=>results.errors.push(error.message));
+  page.on("requestfailed",request=>results.failedRequests.push(`${request.url()} :: ${request.failure()?.errorText}`));
+  await page.goto("http://127.0.0.1:4173/",{waitUntil:"networkidle"});
+  return {context,page};
+}
+
+const desktop=await open({width:1440,height:1000});
+results.checks.title=await desktop.page.title();
+results.checks.heading=await desktop.page.locator("h1").first().innerText();
+await desktop.page.screenshot({path:path.join(process.env.TEMP,"deploy-desktop.png"),fullPage:false});
+const firstTerm=await desktop.page.locator(".card-main h2").innerText();
+await desktop.page.getByRole("button",{name:"翻卡看答案"}).click();
+results.checks.answerVisible=await desktop.page.locator(".answer").isVisible();
+await desktop.page.getByRole("button",{name:"記得",exact:true}).click();
+await desktop.page.waitForTimeout(300);
+results.checks.cardAdvanced=(await desktop.page.locator(".card-main h2").innerText())!==firstTerm;
+await desktop.page.locator(".topbar").getByRole("button",{name:"教材庫",exact:true}).click();
+await desktop.page.getByPlaceholder("搜尋單字、讀音或意思").fill("人");
+results.checks.libraryResults=await desktop.page.locator(".library-list article").count();
+await desktop.page.locator(".topbar").getByRole("button",{name:"閱讀聽力",exact:true}).click();
+results.checks.mediaVisible=await desktop.page.locator(".media-workspace").isVisible();
+results.checks.serviceWorker=await desktop.page.evaluate(async()=>{await navigator.serviceWorker.ready;return (await caches.keys()).length>0});
+await desktop.page.waitForFunction(()=>navigator.serviceWorker.controller!==null);
+results.checks.cacheEntries=await desktop.page.evaluate(async()=>{const names=await caches.keys();const cache=await caches.open(names[0]);return (await cache.keys()).map(request=>request.url)});
+results.checks.cachedAssets=await desktop.page.evaluate(async()=>{const requests=(await (await caches.open((await caches.keys())[0])).keys()).filter(request=>request.url.includes('/assets/'));return Promise.all(requests.map(async request=>({url:request.url,status:(await caches.match(request)).status}))) });
+await desktop.page.reload({waitUntil:"networkidle"});
+await desktop.page.waitForSelector("h1");
+await desktop.page.waitForFunction(()=>navigator.serviceWorker.controller!==null);
+results.checks.onlineErrors=[...results.errors];
+results.errors=[];results.failedRequests=[];
+await desktop.context.setOffline(true);
+await desktop.page.reload({waitUntil:"domcontentloaded"});
+await desktop.page.waitForTimeout(2000);
+results.checks.offlineReload=await desktop.page.locator("h1").count()>0;
+if(!results.checks.offlineReload)results.checks.offlineHtml=(await desktop.page.content()).slice(0,500);
+results.checks.offlineErrors=[...results.errors];
+results.errors=[];results.failedRequests=[];
+await desktop.context.close();
+
+const mobile=await open({width:412,height:915});
+results.checks.mobileNoOverflow=await mobile.page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth);
+results.checks.bottomNav=await mobile.page.locator(".bottom-nav").isVisible();
+await mobile.page.locator(".bottom-nav").getByRole("button",{name:/教材庫/}).click();
+results.checks.mobileLibrary=await mobile.page.getByPlaceholder("搜尋單字、讀音或意思").isVisible();
+await mobile.page.screenshot({path:path.join(process.env.TEMP,"deploy-mobile.png"),fullPage:false});
+await mobile.context.close();
+await browser.close();
+console.log(JSON.stringify(results,null,2));
+if(results.errors.length||results.checks.onlineErrors.length||Object.values(results.checks).some(value=>value===false))process.exit(1);
