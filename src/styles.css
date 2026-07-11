@@ -223,6 +223,94 @@ a {
   color: #727b74;
   font-size: 10px;
 }
+.daily-pace {
+  margin: 0 0 24px;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--moss);
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(34, 55, 43, 0.04);
+}
+.daily-pace.ahead {
+  border-top-color: #3d7656;
+}
+.daily-pace.behind {
+  border-top-color: var(--red);
+}
+.daily-pace-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+}
+.daily-pace-head h2 {
+  margin: 5px 0 3px;
+  font: 700 24px "Noto Serif JP";
+  color: var(--green);
+}
+.daily-pace-head p {
+  margin: 0;
+  color: #647068;
+  font-size: 12px;
+}
+.pace-indicator {
+  flex: none;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #edf3ec;
+  color: var(--green);
+  font-size: 12px;
+}
+.daily-pace.ahead .pace-indicator {
+  background: #e5f2e9;
+  color: #2e6849;
+}
+.daily-pace.behind .pace-indicator {
+  background: #f8e9e6;
+  color: #984434;
+}
+.daily-pace-bar {
+  height: 8px;
+  margin: 16px 0;
+  overflow: hidden;
+  background: #e7ebe5;
+}
+.daily-pace-bar i {
+  display: block;
+  height: 100%;
+  background: var(--moss);
+  transition: width 180ms ease;
+}
+.daily-pace.ahead .daily-pace-bar i {
+  background: #3d7656;
+}
+.daily-pace.behind .daily-pace-bar i {
+  background: var(--red);
+}
+.daily-pace-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.daily-pace-grid article {
+  padding: 10px 12px;
+  background: #f7f8f4;
+}
+.daily-pace-grid span,
+.daily-pace-grid small {
+  display: block;
+  color: #6d786f;
+  font-size: 10px;
+}
+.daily-pace-grid strong {
+  display: block;
+  margin: 4px 0;
+  color: var(--green);
+  font: 700 18px "Noto Serif JP";
+}
+.daily-pace.compact {
+  margin-top: -6px;
+}
 .dashboard-grid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(240px, 0.75fr);
@@ -1355,6 +1443,22 @@ body {
   font-size: 13px;
 }
 @media (max-width: 700px) {
+  .daily-pace {
+    padding: 16px 14px;
+  }
+  .daily-pace-head {
+    display: block;
+  }
+  .daily-pace-head h2 {
+    font-size: 20px;
+  }
+  .pace-indicator {
+    display: inline-block;
+    margin-top: 10px;
+  }
+  .daily-pace-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
   .reference-panel {
     display: block;
     margin-top: -4px;

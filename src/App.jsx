@@ -16,6 +16,7 @@ import {
   restoreSnapshot,
 } from "./db";
 import { getJapaneseVoices, speakJapanese, stopSpeech } from "./speech";
+import { calculateDailyProgress } from "./dailyProgress";
 import DriveSyncPanel from "./DriveSyncPanel";
 import { useGoogleDriveSync } from "./useGoogleDriveSync";
 
@@ -315,6 +316,69 @@ function ExampleTranslation({ example }) {
   );
 }
 
+function DailyPaceCard({ pace, compact = false }) {
+  const statusText = pace.beforePlan
+    ? "計畫尚未開始"
+    : pace.afterPlan
+      ? "年度計畫已結束"
+      : pace.status === "ahead"
+        ? `超前 ${pace.delta} 項`
+        : pace.status === "behind"
+          ? `落後 ${Math.abs(pace.delta)} 項`
+          : "符合進度";
+  const guidance = pace.beforePlan
+    ? "可以先熟悉操作，正式進度會從 115/07 開始計算。"
+    : pace.afterPlan
+      ? "已按年度總目標計算，請前往進度成果確認結案完成率。"
+      : pace.status === "behind"
+        ? `再完成 ${pace.remainingToExpected} 項即可追上今天進度。`
+        : pace.status === "ahead"
+          ? "目前已超前，可以安排複習或挑戰閱讀聽力。"
+          : "今天已達標，保持目前節奏即可。";
+  return (
+    <section className={`daily-pace ${pace.status} ${compact ? "compact" : ""}`}>
+      <div className="daily-pace-head">
+        <div>
+          <span className="eyebrow">
+            DAILY PACE · {formatPeriod(pace.currentPeriod)} · 第 {pace.day}/
+            {pace.daysInMonth} 天
+          </span>
+          <h2>
+            實際 {pace.actualTotal.toLocaleString()} / 今日應達{" "}
+            {pace.expectedTotal.toLocaleString()}
+          </h2>
+          <p>
+            今日新增目標 {pace.todayTargetTotal} 項。{guidance}
+          </p>
+        </div>
+        <strong className="pace-indicator" aria-label={`學習進度：${statusText}`}>
+          {statusText}
+        </strong>
+      </div>
+      <div
+        className="daily-pace-bar"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax={Math.max(1, pace.expectedTotal)}
+        aria-valuenow={Math.min(pace.actualTotal, pace.expectedTotal)}
+      >
+        <i style={{ width: `${pace.percent}%` }} />
+      </div>
+      <div className="daily-pace-grid">
+        {pace.categories.map((item) => (
+          <article key={item.key}>
+            <span>{item.label}</span>
+            <strong>
+              {item.actual.toLocaleString()} / {item.expected.toLocaleString()}
+            </strong>
+            <small>今日目標 +{item.todayTarget}</small>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function PeriodRail({ activePeriod, setActivePeriod, data }) {
   const currentIndex = PERIODS.indexOf(currentRocPeriod());
   return (
@@ -359,6 +423,7 @@ function TodayView({
   goMedia,
   pageState,
   updatePage,
+  dailyPace,
 }) {
   const unlocked = useMemo(
     () => ({
@@ -444,6 +509,7 @@ function TodayView({
             </p>
           </div>
         </div>
+        <DailyPaceCard pace={dailyPace} />
         <Empty text="太棒了，等待下一階段解鎖吧！" />
       </section>
     );
@@ -466,6 +532,7 @@ function TodayView({
           <small>本批達標</small>
         </div>
       </div>
+      <DailyPaceCard pace={dailyPace} />
       {notice && (
         <div className="week-card unlock-notice" role="status">
           ✓ {notice}
@@ -1185,7 +1252,14 @@ function MockView({
   );
 }
 
-function ProgressView({ data, activePeriod, store, pageState, updatePage }) {
+function ProgressView({
+  data,
+  activePeriod,
+  store,
+  pageState,
+  updatePage,
+  dailyPace,
+}) {
   const unlocked = [
     ...data.vocabulary,
     ...data.grammar,
@@ -1230,9 +1304,10 @@ function ProgressView({ data, activePeriod, store, pageState, updatePage }) {
         title="進度成果"
         text="每次練習都只保存在這台裝置；可輸出 CSV 或直接列印。"
       />
+      <DailyPaceCard pace={dailyPace} compact />
       <div className="metric-grid">
         <article>
-          <span>已學教材</span>
+          <span>已有學習紀錄</span>
           <strong>{learned.toLocaleString()}</strong>
           <small>/ {unlocked.length.toLocaleString()}</small>
         </article>
@@ -1272,6 +1347,13 @@ function ProgressView({ data, activePeriod, store, pageState, updatePage }) {
               ?.grammar
           }
           。目前記錄 {store.events.length} 次學習事件。
+          截至今日應達 {dailyPace.expectedTotal.toLocaleString()} 項，實際完成{" "}
+          {dailyPace.actualTotal.toLocaleString()} 項，
+          {dailyPace.delta > 0
+            ? `超前 ${dailyPace.delta} 項。`
+            : dailyPace.delta < 0
+              ? `落後 ${Math.abs(dailyPace.delta)} 項。`
+              : "目前符合進度。"}
         </p>
         <label>
           老師回饋
@@ -1525,6 +1607,10 @@ export default function App() {
   );
   const view = session.view;
   const activePeriod = session.activePeriod;
+  const dailyPace = useMemo(
+    () => calculateDailyProgress(data, store.progress),
+    [data, store.progress],
+  );
   useEffect(() => {
     loadStudyData()
       .then(setData)
@@ -1571,7 +1657,7 @@ export default function App() {
         <span>{error}</span>
       </div>
     );
-  const completed = Object.keys(store.progress).length;
+  const completed = dailyPace.actualTotal;
   return (
     <div className="app-shell">
       <Header
@@ -1597,6 +1683,7 @@ export default function App() {
               settings={settings}
               pageState={session.pages.today}
               updatePage={pageActions.today}
+              dailyPace={dailyPace}
               goMedia={(type) => {
                 pageActions.media((current) => ({
                   ...current,
@@ -1645,6 +1732,7 @@ export default function App() {
               store={store}
               pageState={session.pages.progress}
               updatePage={pageActions.progress}
+              dailyPace={dailyPace}
             />
           )}{" "}
           {view === "settings" && (

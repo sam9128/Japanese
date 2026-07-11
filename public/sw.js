@@ -1,4 +1,4 @@
-const CACHE = "nihongo-stairs-v15-sigure-news-revision";
+const CACHE = "nihongo-stairs-v16-daily-pace";
 const PERIODS = [
   "115-07",
   "115-08",
