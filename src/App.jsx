@@ -37,9 +37,17 @@ const EMPTY = {
   index: { counts: {} },
 };
 const STRONG_RATINGS = new Set(["good", "easy"]);
+const LIBRARY_PAGE_SIZES = [30, 60, 120];
 const DEFAULT_PAGE_STATES = {
   today: { index: 0, revealed: false, scrollY: 0 },
-  library: { query: "", type: "vocabulary", onlyWeak: false, scrollY: 0 },
+  library: {
+    query: "",
+    type: "vocabulary",
+    onlyWeak: false,
+    page: 1,
+    pageSize: 30,
+    scrollY: 0,
+  },
   media: {
     type: "reading",
     selected: 0,
@@ -651,7 +659,10 @@ function LibraryView({
   const query = pageState.query || "";
   const type = pageState.type || "vocabulary";
   const onlyWeak = Boolean(pageState.onlyWeak);
-  const items = useMemo(
+  const pageSize = LIBRARY_PAGE_SIZES.includes(Number(pageState.pageSize))
+    ? Number(pageState.pageSize)
+    : 30;
+  const filteredItems = useMemo(
     () =>
       data[type]
         .filter((x) => isUnlocked(x, activePeriod))
@@ -660,9 +671,36 @@ function LibraryView({
           `${x.term}${x.reading}${x.meaningZh}`
             .toLowerCase()
             .includes(query.toLowerCase()),
-        )
-        .slice(0, 120),
+        ),
     [data, type, query, onlyWeak, store.progress, activePeriod],
+  );
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const currentPage = Math.min(
+    Math.max(Number(pageState.page) || 1, 1),
+    totalPages,
+  );
+  const pageStart = filteredItems.length ? (currentPage - 1) * pageSize : 0;
+  const items = useMemo(
+    () => filteredItems.slice(pageStart, pageStart + pageSize),
+    [filteredItems, pageStart, pageSize],
+  );
+  const pageEnd = Math.min(pageStart + items.length, filteredItems.length);
+  const updateLibraryFilter = useCallback(
+    (changes) =>
+      updatePage((current) => ({
+        ...current,
+        ...changes,
+        page: 1,
+      })),
+    [updatePage],
+  );
+  const goToPage = useCallback(
+    (page) =>
+      updatePage((current) => ({
+        ...current,
+        page: Math.min(Math.max(page, 1), totalPages),
+      })),
+    [updatePage, totalPages],
   );
   return (
     <section>
@@ -684,34 +722,50 @@ function LibraryView({
       <div className="toolbar">
         <input
           value={query}
-          onChange={(e) =>
-            updatePage((current) => ({ ...current, query: e.target.value }))
-          }
+          onChange={(e) => updateLibraryFilter({ query: e.target.value })}
           placeholder="搜尋單字、讀音或中文意思"
         />
         <select
           value={type}
-          onChange={(e) =>
-            updatePage((current) => ({ ...current, type: e.target.value }))
-          }
+          onChange={(e) => updateLibraryFilter({ type: e.target.value })}
         >
           <option value="vocabulary">單字</option>
           <option value="grammar">文法</option>
+        </select>
+        <select
+          value={pageSize}
+          aria-label="每頁顯示筆數"
+          onChange={(e) =>
+            updateLibraryFilter({ pageSize: Number(e.target.value) })
+          }
+        >
+          {LIBRARY_PAGE_SIZES.map((size) => (
+            <option key={size} value={size}>
+              每頁 {size} 筆
+            </option>
+          ))}
         </select>
         <label>
           <input
             type="checkbox"
             checked={onlyWeak}
             onChange={(e) =>
-              updatePage((current) => ({
-                ...current,
+              updateLibraryFilter({
                 onlyWeak: e.target.checked,
-              }))
+              })
             }
           />{" "}
           只看錯題
         </label>
       </div>
+      <LibraryPagination
+        total={filteredItems.length}
+        pageStart={pageStart}
+        pageEnd={pageEnd}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={goToPage}
+      />
       <div className="library-list">
         {items.map((item) => (
           <article key={item.id}>
@@ -744,8 +798,81 @@ function LibraryView({
           </article>
         ))}
       </div>
-      {!items.length && <Empty text="沒有符合條件的教材。" />}
+      {!filteredItems.length && <Empty text="沒有符合條件的教材。" />}
+      {filteredItems.length > pageSize && (
+        <LibraryPagination
+          total={filteredItems.length}
+          pageStart={pageStart}
+          pageEnd={pageEnd}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={goToPage}
+          compact
+        />
+      )}
     </section>
+  );
+}
+
+function LibraryPagination({
+  total,
+  pageStart,
+  pageEnd,
+  currentPage,
+  totalPages,
+  onPageChange,
+  compact = false,
+}) {
+  if (!total) {
+    return (
+      <div className="library-pagination">
+        <span>共 0 筆教材</span>
+      </div>
+    );
+  }
+
+  return (
+    <nav
+      className={`library-pagination${compact ? " compact" : ""}`}
+      aria-label="教材庫分頁"
+    >
+      <span>
+        顯示 {pageStart + 1}–{pageEnd}／共 {total} 筆
+      </span>
+      <div>
+        <button
+          type="button"
+          onClick={() => onPageChange(1)}
+          disabled={currentPage === 1}
+        >
+          第一頁
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+        >
+          上一頁
+        </button>
+        <strong>
+          {currentPage} / {totalPages}
+        </strong>
+        <button
+          type="button"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+        >
+          下一頁
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(totalPages)}
+          disabled={currentPage === totalPages}
+        >
+          最後頁
+        </button>
+      </div>
+    </nav>
   );
 }
 
