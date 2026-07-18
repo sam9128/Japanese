@@ -557,7 +557,7 @@ function TodayView({
             </button>
           </div>
           <div
-            className="card-main"
+            className={`card-main${revealed ? " is-revealed" : ""}`}
             onClick={() =>
               updatePage((current) => ({ ...current, revealed: true }))
             }
