@@ -14,6 +14,7 @@
     "export:text": "node scripts/export-content-text.mjs",
     "validate:content": "node scripts/validate-content.mjs",
     "validate:vocab-translations": "node scripts/validate-vocab-translations.mjs",
+    "validate:grammar": "node scripts/validate-grammar-content.mjs",
     "validate:progress": "node scripts/validate-daily-progress.mjs",
     "validate:sync": "node scripts/validate-sync.mjs"
   },

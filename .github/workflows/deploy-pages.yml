@@ -26,6 +26,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run validate:content
       - run: pnpm run validate:vocab-translations
+      - run: pnpm run validate:grammar
       - run: pnpm run validate:progress
       - run: pnpm run validate:sync
       - run: pnpm build
