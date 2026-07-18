@@ -1,4 +1,4 @@
-const CACHE = "nihongo-stairs-v17-mobile-card";
+const CACHE = "nihongo-stairs-v18-vocab-zh";
 const PERIODS = [
   "115-07",
   "115-08",

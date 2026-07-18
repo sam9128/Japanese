@@ -59,6 +59,18 @@ const termZhOverrides = {
   "ショー":"表演；節目", "レッド":"紅色", "結婚":"結婚；婚姻", "ブルー":"藍色；憂鬱的", "初めて":"第一次；初次",
   "やっぱり":"果然；還是；畢竟", "オンライン":"線上；連線中", "生活":"生活；過日子", "け":"毛；頭髮；毛皮", "バイク":"摩托車；機車"
 };
+Object.assign(termZhOverrides, {
+  "こういう": "這樣的；這種",
+  "どういう": "怎樣的；什麼樣的",
+  "男性": "男性；男人",
+  "おかしい": "奇怪；可笑；不正常",
+  "台": "台；架子；座；機械或車輛的量詞",
+  "落ちる": "掉落；落下；落榜；下降",
+  "ないしょ": "秘密；保密",
+  "ヒミツ": "秘密；保密",
+  "ナイショ": "秘密；保密",
+  "秘密": "秘密；保密",
+});
 
 const zhExact = {
   person: "人", people: "人們", thing: "事物", matter: "事情", fact: "事實", time: "時間", day: "日子",
@@ -75,20 +87,262 @@ const zhExact = {
   "not": "不；沒有", "yes": "是", "no": "不；沒有", "way": "方法", "reason": "理由", "problem": "問題"
 };
 
+const glossZhOverrides = {
+  "'s": "……的",
+  "-like": "像……的；帶有……感的",
+  "a bit": "有點；稍微",
+  "a little": "一點；稍微",
+  "a lot": "很多；非常",
+  "about": "關於；大約",
+  "abroad": "國外；海外",
+  "all": "全部；所有",
+  "all members": "全體成員",
+  "already": "已經",
+  "also": "也；而且",
+  "amazing": "驚人的；很棒的",
+  "annual period": "一年期間",
+  "annoying": "吵鬧的；煩人的",
+  "another": "另一個；其他的",
+  "appearance": "外觀；樣子",
+  "arrangements": "安排；準備",
+  "as expected": "果然；如預期",
+  "as if": "好像；彷彿",
+  "bad": "不好；差",
+  "bad taste": "味道不好；難吃",
+  "bear": "熊",
+  "be able to get": "能得到；能拿到",
+  "be able to receive": "能收到；能領取",
+  "be defeated": "被打敗；輸掉",
+  "beautiful": "美麗的",
+  "big": "大的",
+  "black": "黑色；黑色的",
+  "boy": "男孩；男子",
+  "by chance": "偶然；碰巧",
+  "chamber": "房間；室",
+  "chestnut": "栗子",
+  "circle": "圓；圈",
+  "clever": "聰明；機靈",
+  "coming": "即將到來的",
+  "concert": "演唱會；音樂會",
+  "cool": "酷；帥氣；涼爽",
+  "counter for machines": "機械、車輛等的量詞",
+  "counter for months": "月份量詞；……個月",
+  "crab": "螃蟹",
+  "cute": "可愛的",
+  "dangerous": "危險的",
+  "dark circles under eyes": "黑眼圈",
+  "delicious": "美味；好吃",
+  "difficult": "困難的",
+  "disagreeable": "討厭的；不愉快的",
+  "disappear": "消失；不見",
+  "dislike": "討厭；不喜歡",
+  "diverse": "多樣的",
+  "easy": "容易的",
+  "enough": "足夠；夠了",
+  "etc.": "等等",
+  "excellent": "優秀的；很棒的",
+  "fairly": "相當；還算",
+  "famous": "有名；著名",
+  "feces": "糞便；大便",
+  "feeling": "感覺；心情",
+  "few": "少的；幾乎沒有",
+  "final": "最後的",
+  "fine": "可以；很好；細緻",
+  "fool": "笨蛋；傻瓜",
+  "foolish": "愚蠢的",
+  "frightening": "可怕的",
+  "funny": "有趣的；奇怪的",
+  "ginger": "薑",
+  "glasses": "眼鏡",
+  "gold": "金；金色；金錢",
+  "gradually": "逐漸地",
+  "great": "很棒；偉大",
+  "green": "綠色；綠色的",
+  "happy": "開心；幸福",
+  "hard": "困難的；堅硬的",
+  "hopeless": "無望；沒辦法",
+  "how": "如何；怎樣",
+  "how many": "多少；幾個",
+  "idiot": "笨蛋；白痴",
+  "important": "重要的",
+  "informal": "口語的；非正式的",
+  "it's about time": "差不多該……了",
+  "jazz": "爵士樂",
+  "karaoke": "卡拉 OK",
+  "kind": "種類；類型",
+  "last": "最後；上次",
+  "little": "少量；一點",
+  "lovely": "可愛；美好",
+  "male": "男性；雄性",
+  "man": "男人；男性",
+  "many kinds of": "各式各樣的",
+  "manner": "方式；態度",
+  "marron": "栗子",
+  "messy": "凌亂；亂七八糟",
+  "mochi": "麻糬",
+  "mood": "心情；情緒",
+  "next": "下一個；接下來",
+  "next time": "下次",
+  "nice": "好的；不錯",
+  "no good": "不行；不好",
+  "noisy": "吵鬧的",
+  "not at all": "一點也不",
+  "not much": "不太；不多",
+  "not very": "不太",
+  "odd": "奇怪的",
+  "only": "只有；僅僅",
+  "orange": "橘子；橘色",
+  "overseas": "海外；國外",
+  "period": "期間；時期",
+  "playing cards": "撲克牌",
+  "platform": "平台；月台",
+  "pocket": "口袋",
+  "poop": "大便；便便",
+  "precious": "珍貴；重要",
+  "preparation": "準備",
+  "quite": "相當；很",
+  "really": "真的；非常",
+  "regrettable": "遺憾；可惜",
+  "rock": "岩石",
+  "rose": "玫瑰",
+  "room": "房間；室",
+  "rude": "失禮；粗魯",
+  "run out of": "用完；耗盡",
+  "scary": "可怕的",
+  "secret": "秘密；保密",
+  "skillful": "熟練；拿手",
+  "soon": "快要；不久",
+  "sort": "種類；類型",
+  "sort of": "一種；類型",
+  "special": "特別；特殊",
+  "spectacles": "眼鏡",
+  "stand": "台；架子；立場",
+  "startled": "嚇一跳；吃驚",
+  "stone": "石頭",
+  "strange": "奇怪的",
+  "style": "風格；樣式",
+  "stylish": "時髦；有型",
+  "such": "這樣的；那樣的",
+  "surprised": "驚訝的",
+  "that kind of": "那樣的；那種",
+  "this kind of": "這樣的；這種",
+  "this time": "這次",
+  "to be altered": "被改變；變化",
+  "to be able to get": "能得到；能拿到",
+  "to be able to receive": "能收到；能領取",
+  "to be defeated": "輸；被打敗",
+  "to change": "改變；變化",
+  "to die": "死；死亡",
+  "to disappear": "消失；不見",
+  "to drop": "掉下；落下",
+  "to fall": "掉落；落下",
+  "to get": "得到；拿到",
+  "to give": "給予",
+  "to hit": "打；碰撞",
+  "to lose": "失去；輸",
+  "to put on": "穿上；戴上",
+  "to receive": "收到；領取",
+  "to run out of": "用完；耗盡",
+  "to say": "說",
+  "to stop": "停止；停下",
+  "too bad": "遺憾；可惜",
+  "tough": "辛苦；困難",
+  "type": "種類；類型",
+  "unappetizing": "不好吃；倒胃口",
+  "unfortunate": "不幸；遺憾",
+  "unpleasant": "不愉快；討厭",
+  "useless": "沒用；無用",
+  "valuable": "有價值；珍貴",
+  "variety": "種類；變化",
+  "various": "各式各樣；各種",
+  "vehicles": "車輛；交通工具",
+  "very": "非常；很",
+  "village": "村莊",
+  "what": "什麼",
+  "what kind of": "什麼樣的；哪一種",
+  "what sort of": "什麼樣的；哪一類",
+  "white": "白色；白色的",
+  "whole": "整個；全部",
+  "wonderful": "很棒；精彩",
+};
+
+const dictionaryNoisePattern =
+  /(DOS|Internet|chief executive|CEO|命令|內部|内部|總線|总线|後端|后端|程序|文件|標準輸出|标准输出|校驗|校验|屏幕|設備|设备|位元|比特|系統|系统|網路|网络|Internet網|複數形式|复数形式|過去式|过去式|過去分詞|过去分词|現在分詞|现在分词|三單形式|三单形式|abbr\.|suff\.)/i;
+const posPrefixPattern = /^(?:a|adj|ad|adv|n|v|vi|vt|prep|conj|pron|interj|int|num|art|pl)\.\s*/i;
+
 function normalizeEnglish(value = "") {
-  return value.toLowerCase().replace(/\([^)]*\)/g, "").replace(/\s+/g, " ").trim().replace(/^[.']+|[.']+$/g, "");
+  return value
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, "")
+    .replace(/\betc\.\)?/g, "etc.")
+    .replace(/\be\.g\.\)?/g, "e.g.")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^[.']+|[.']+$/g, "");
+}
+
+function cleanDictionaryZh(value = "") {
+  const normalized = toTraditional(value)
+    .replace(/\\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/[()（）][^()（）]*[a-zA-Z][^()（）]*[()（）]/g, "")
+    .replace(/\[[^\]]{0,40}\]/g, "");
+  const senses = normalized
+    .split(/[\n,，;；、]/)
+    .map((sense) => sense.trim().replace(posPrefixPattern, "").trim())
+    .map((sense) => sense.replace(/^<日>/, "").replace(/^〈日〉/, "").trim())
+    .filter(Boolean)
+    .filter((sense) => !dictionaryNoisePattern.test(sense))
+    .filter((sense) => !/[a-zA-Z]/.test(sense))
+    .filter((sense) => /[\u3400-\u9fff]/.test(sense));
+  return [...new Set(senses)].slice(0, 2).join("、");
 }
 
 function lookupZh(part) {
   const key = normalizeEnglish(part);
-  const candidates = [key, key.replace(/^to /, ""), key.replace(/^one'?s /, ""), key.replace(/s$/, "")];
+  if (!key || ["etc", "etc.", "e.g", "e.g."].includes(key)) return "";
+  if (glossZhOverrides[key]) return glossZhOverrides[key];
+  const candidates = [
+    key,
+    key.replace(/^to be able to /, "to "),
+    key.replace(/^to /, ""),
+    key.replace(/^be /, ""),
+    key.replace(/^one'?s /, ""),
+    key.replace(/ies$/, "y"),
+    key.replace(/s$/, ""),
+  ];
   for (const candidate of candidates) {
-    const translated = ecdictZh[candidate] && toTraditional(ecdictZh[candidate]);
+    if (glossZhOverrides[candidate]) return glossZhOverrides[candidate];
+  }
+  if (key.includes(" ")) {
+    const stopWords = new Set(["the", "and", "for", "with", "from", "into", "that", "this", "one", "ones", "someone", "something", "very", "often", "as", "a", "an", "of", "or"]);
+    const translatedWords =
+      key
+        .match(/[a-z][a-z'-]+/g)
+        ?.filter((word) => !stopWords.has(word))
+        .map((word) => glossZhOverrides[word] || cleanDictionaryZh(ecdictZh[word] || "").split(/[、；]/)[0])
+        .filter((value) => /[\u3400-\u9fff]/.test(value || "")) || [];
+    return [...new Set(translatedWords)].slice(0, 3).join("、");
+  }
+  for (const candidate of candidates) {
+    const translated = cleanDictionaryZh(ecdictZh[candidate] || "");
     if (/[\u3400-\u9fff]/.test(translated || "")) return translated;
   }
-  const stopWords = new Set(["the","and","for","with","from","into","that","this","one","ones","someone","something","very"]);
-  const translatedWords = key.match(/[a-z][a-z'-]+/g)?.filter((word) => !stopWords.has(word)).map((word) => ecdictZh[word] && toTraditional(ecdictZh[word]).split(/[；，]/)[0]).filter((value) => /[\u3400-\u9fff]/.test(value || "")) || [];
-  return [...new Set(translatedWords)].slice(0, 3).join("、");
+  return "";
+}
+
+function compactMeanings(values = [], max = 4) {
+  const segments = values
+    .flatMap((value) => String(value || "").split("；"))
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const unique = [];
+  for (const segment of segments) {
+    if (unique.includes(segment)) continue;
+    if (unique.some((value) => value.includes(segment) || segment.includes(value))) continue;
+    unique.push(segment);
+  }
+  return unique.slice(0, max).join("；");
 }
 
 function toZh(gloss = "", term = "此詞") {
@@ -104,7 +358,7 @@ function toZh(gloss = "", term = "此詞") {
     }
     return "";
   }).filter(Boolean);
-  return [...new Set(translated)].slice(0, 4).join("；") || `「${term}」表示例句中所呈現的事物、動作或狀態，請配合上下文理解`;
+  return compactMeanings(translated) || `「${term}」表示例句中所呈現的事物、動作或狀態，請配合上下文理解`;
 }
 
 function usageZh(item, meaningZh) {

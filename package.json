@@ -13,6 +13,7 @@
     "translate:examples": "node scripts/translate-examples.mjs",
     "export:text": "node scripts/export-content-text.mjs",
     "validate:content": "node scripts/validate-content.mjs",
+    "validate:vocab-translations": "node scripts/validate-vocab-translations.mjs",
     "validate:progress": "node scripts/validate-daily-progress.mjs",
     "validate:sync": "node scripts/validate-sync.mjs"
   },
