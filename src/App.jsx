@@ -1161,20 +1161,27 @@ function MockView({
     ? Math.max(0, Math.floor((clock - startedAt) / 1000))
     : Number(review?.seconds) || 0;
   async function finish() {
+    const answeredCount = Object.keys(answers).length;
+    if (
+      answeredCount < questions.length &&
+      !window.confirm(
+        `還有 ${questions.length - answeredCount} 題尚未作答，確定要提前交卷嗎？`,
+      )
+    )
+      return;
     const correct = questions.filter(
       (question, index) => answers[index] === question.answer,
     ).length;
     const score = Math.round((correct / questions.length) * 100);
-    const finishedSeconds = Math.max(
-      0,
-      Math.floor((Date.now() - startedAt) / 1000),
-    );
+    const finishedSeconds = seconds;
     await store.saveResult({
       id: `${exam.id}-${Date.now()}`,
       assessmentId: exam.id,
       title: exam.title,
       score,
       seconds: finishedSeconds,
+      answeredCount,
+      submittedEarly: answeredCount < questions.length,
       completedAt: new Date().toISOString(),
     });
     updatePage((current) => ({
@@ -1183,6 +1190,23 @@ function MockView({
       answers: {},
       startedAt: null,
       review: { examId: exam.id, answers, score, seconds: finishedSeconds },
+      scrollY: 0,
+    }));
+    window.scrollTo(0, 0);
+  }
+  function cancelExam() {
+    const answeredCount = Object.keys(answers).length;
+    if (
+      answeredCount > 0 &&
+      !window.confirm("確定要取消本次作答嗎？目前答案會被清除，且不會留下成績。")
+    )
+      return;
+    updatePage((current) => ({
+      ...current,
+      examId: null,
+      answers: {},
+      startedAt: null,
+      review: null,
       scrollY: 0,
     }));
     window.scrollTo(0, 0);
@@ -1323,13 +1347,16 @@ function MockView({
               ))}
             </fieldset>
           ))}
-          <button
-            className="primary"
-            onClick={finish}
-            disabled={Object.keys(answers).length < questions.length}
-          >
-            答案を提出する（交卷）
-          </button>
+          <div className="exam-actions">
+            <button type="button" onClick={cancelExam}>
+              取消作答
+            </button>
+            <button className="primary" type="button" onClick={finish}>
+              {Object.keys(answers).length < questions.length
+                ? "提前交卷"
+                : "答案を提出する（交卷）"}
+            </button>
+          </div>
           <p className="answer-count">
             回答済み：{Object.keys(answers).length} / {questions.length}
           </p>

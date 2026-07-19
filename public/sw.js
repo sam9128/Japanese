@@ -1,4 +1,4 @@
-const CACHE = "nihongo-stairs-v20-schedule-settings";
+const CACHE = "nihongo-stairs-v21-exam-actions";
 const PERIODS = [
   "115-07",
   "115-08",
