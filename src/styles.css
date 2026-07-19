@@ -494,7 +494,10 @@ a {
 }
 .toolbar input,
 .toolbar select,
-.settings-grid select {
+.settings-grid select,
+.settings-grid input[type="text"],
+.settings-grid input[type="date"],
+.settings-grid input[type="number"] {
   border: 1px solid var(--line);
   background: #fff;
   padding: 12px 14px;
@@ -934,10 +937,66 @@ a {
   margin: 16px 0;
 }
 .settings-grid input[type="range"],
-.settings-grid select {
+.settings-grid select,
+.settings-grid input[type="text"],
+.settings-grid input[type="date"],
+.settings-grid input[type="number"] {
   width: 100%;
   display: block;
   margin-top: 7px;
+}
+.settings-grid textarea {
+  width: 100%;
+  min-height: 92px;
+  display: block;
+  margin-top: 7px;
+  border: 1px solid var(--line);
+  padding: 13px;
+  resize: vertical;
+}
+.settings-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+.settings-card-head h3 {
+  margin: 4px 0 0;
+}
+.schedule-settings-card {
+  grid-column: span 2;
+}
+.schedule-form-grid,
+.schedule-target-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.schedule-target-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+.schedule-target-grid small {
+  display: block;
+  margin-top: 5px;
+  color: #6d786f;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.toggle-row {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #f7f8f4;
+  border: 1px solid var(--line);
+}
+.toggle-row input {
+  width: auto;
+  margin: 0;
+}
+.schedule-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 .warning {
   background: #fff4dc;
@@ -962,6 +1021,10 @@ a {
 .status-dot {
   font-size: 12px;
   color: var(--moss);
+}
+.status-dot.active {
+  background: #e5f2e9;
+  color: #2e6849;
 }
 .settings-grid a {
   color: var(--green);
@@ -1349,6 +1412,23 @@ a {
   .assessment-grid,
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+  .schedule-settings-card {
+    grid-column: auto;
+  }
+  .settings-card-head {
+    display: block;
+  }
+  .schedule-form-grid,
+  .schedule-target-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .schedule-actions {
+    justify-content: stretch;
+  }
+  .schedule-actions button {
+    width: 100%;
   }
   .metric-grid {
     grid-template-columns: 1fr 1fr;

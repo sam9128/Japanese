@@ -1,4 +1,4 @@
-const CACHE = "nihongo-stairs-v19-grammar-zh";
+const CACHE = "nihongo-stairs-v20-schedule-settings";
 const PERIODS = [
   "115-07",
   "115-08",

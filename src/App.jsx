@@ -18,6 +18,11 @@ import {
 import { getJapaneseVoices, speakJapanese, stopSpeech } from "./speech";
 import { calculateDailyProgress } from "./dailyProgress";
 import DriveSyncPanel from "./DriveSyncPanel";
+import {
+  DEFAULT_SCHEDULE_SETTINGS,
+  normalizeScheduleSettings,
+  withScheduleUpdatedAt,
+} from "./scheduleSettings";
 import { useGoogleDriveSync } from "./useGoogleDriveSync";
 
 const NAV = [
@@ -1506,7 +1511,163 @@ function ProgressView({
   );
 }
 
-function SettingsView({ settings, setSettings, onRestored, drive }) {
+const SCHEDULE_TARGET_FIELDS = [
+  ["vocabulary", "單字目標", 4000],
+  ["grammar", "文法目標", 240],
+  ["reading", "閱讀篇數", 52],
+  ["listening", "聽力組數", 104],
+];
+
+function ScheduleSettingsPanel({
+  scheduleSettings,
+  setScheduleSettings,
+  resetScheduleSettings,
+}) {
+  const startTime = Date.parse(`${scheduleSettings.startDate}T00:00:00`);
+  const endTime = Date.parse(`${scheduleSettings.endDate}T00:00:00`);
+  const invalidRange =
+    Number.isFinite(startTime) && Number.isFinite(endTime) && endTime < startTime;
+  return (
+    <article className="schedule-settings-card">
+      <div className="settings-card-head">
+        <div>
+          <span className="eyebrow">SCHEDULE</span>
+          <h3>日程與目標設定</h3>
+        </div>
+        <span className={`status-dot ${scheduleSettings.enabled ? "active" : ""}`}>
+          {scheduleSettings.enabled ? "使用自訂進度" : "使用預設年度安排"}
+        </span>
+      </div>
+      <p>
+        這裡只調整「每日進度指標」怎麼判斷超前或落後；教材原本的
+        115/07～116/06 解鎖時間不會被變動。
+      </p>
+      <label className="toggle-row">
+        <input
+          type="checkbox"
+          checked={scheduleSettings.enabled}
+          onChange={(event) =>
+            setScheduleSettings((current) => ({
+              ...current,
+              enabled: event.target.checked,
+            }))
+          }
+        />
+        <span>啟用自訂進度與目標</span>
+      </label>
+      <label>
+        目標名稱
+        <input
+          type="text"
+          value={scheduleSettings.goalName}
+          onChange={(event) =>
+            setScheduleSettings((current) => ({
+              ...current,
+              goalName: event.target.value,
+            }))
+          }
+        />
+      </label>
+      <div className="schedule-form-grid">
+        <label>
+          開始日期
+          <input
+            type="date"
+            value={scheduleSettings.startDate}
+            onChange={(event) =>
+              setScheduleSettings((current) => ({
+                ...current,
+                startDate: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label>
+          結束日期
+          <input
+            type="date"
+            value={scheduleSettings.endDate}
+            onChange={(event) =>
+              setScheduleSettings((current) => ({
+                ...current,
+                endDate: event.target.value,
+              }))
+            }
+          />
+        </label>
+        <label>
+          每週學習分鐘
+          <input
+            type="number"
+            min="0"
+            max="10080"
+            value={scheduleSettings.weeklyMinutes}
+            onChange={(event) =>
+              setScheduleSettings((current) => ({
+                ...current,
+                weeklyMinutes: event.target.value,
+              }))
+            }
+          />
+        </label>
+      </div>
+      {invalidRange && (
+        <p className="form-error">結束日期不可早於開始日期；系統會先以單日目標計算。</p>
+      )}
+      <div className="schedule-target-grid">
+        {SCHEDULE_TARGET_FIELDS.map(([key, label, max]) => (
+          <label key={key}>
+            {label}
+            <input
+              type="number"
+              min="0"
+              max={max}
+              value={scheduleSettings.targets[key]}
+              onChange={(event) =>
+                setScheduleSettings((current) => ({
+                  ...current,
+                  targets: {
+                    ...current.targets,
+                    [key]: event.target.value,
+                  },
+                }))
+              }
+            />
+            <small>最多 {max.toLocaleString()}，不會新增或刪除教材。</small>
+          </label>
+        ))}
+      </div>
+      <label>
+        學習備註
+        <textarea
+          value={scheduleSettings.notes}
+          onChange={(event) =>
+            setScheduleSettings((current) => ({
+              ...current,
+              notes: event.target.value,
+            }))
+          }
+          placeholder="例如：每天通勤 20 分鐘、週末補閱讀與模考。"
+        />
+      </label>
+      <div className="schedule-actions">
+        <button type="button" onClick={resetScheduleSettings}>
+          重設為預設年度安排
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function SettingsView({
+  settings,
+  setSettings,
+  scheduleSettings,
+  setScheduleSettings,
+  resetScheduleSettings,
+  onRestored,
+  drive,
+}) {
   const [voices, setVoices] = useState([]);
   const [preview, setPreview] = useState(null);
   const fileRef = useRef();
@@ -1552,6 +1713,11 @@ function SettingsView({ settings, setSettings, onRestored, drive }) {
       />
       <div className="settings-grid">
         <DriveSyncPanel drive={drive} />
+        <ScheduleSettingsPanel
+          scheduleSettings={scheduleSettings}
+          setScheduleSettings={setScheduleSettings}
+          resetScheduleSettings={resetScheduleSettings}
+        />
         <article>
           <h3>日語語音</h3>
           <label>
@@ -1698,6 +1864,51 @@ function download(name, content, type) {
   URL.revokeObjectURL(url);
 }
 
+function useScheduleSettings() {
+  const [scheduleSettings, setScheduleSettings] = useState(
+    DEFAULT_SCHEDULE_SETTINGS,
+  );
+  const [ready, setReady] = useState(false);
+  const load = useCallback(() => {
+    getAll("settings")
+      .then((xs) => {
+        const saved = xs.find((x) => x.id === "schedule-plan")?.value;
+        setScheduleSettings(normalizeScheduleSettings(saved));
+      })
+      .finally(() => setReady(true));
+  }, []);
+  useEffect(() => {
+    void load();
+    window.addEventListener(REMOTE_APPLIED_EVENT, load);
+    return () => window.removeEventListener(REMOTE_APPLIED_EVENT, load);
+  }, [load]);
+  useEffect(() => {
+    if (!ready) return;
+    void put("settings", {
+      id: "schedule-plan",
+      value: scheduleSettings,
+      updatedAt: scheduleSettings.updatedAt,
+    });
+  }, [ready, scheduleSettings]);
+  const updateScheduleSettings = useCallback((updater) => {
+    setScheduleSettings(withScheduleUpdatedAt(updater));
+  }, []);
+  const resetScheduleSettings = useCallback(() => {
+    setScheduleSettings(
+      normalizeScheduleSettings({
+        ...DEFAULT_SCHEDULE_SETTINGS,
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+  }, []);
+  return {
+    scheduleSettings,
+    scheduleReady: ready,
+    updateScheduleSettings,
+    resetScheduleSettings,
+  };
+}
+
 export default function App() {
   const [data, setData] = useState(EMPTY);
   const [loading, setLoading] = useState(true);
@@ -1715,6 +1926,12 @@ export default function App() {
   } = useUiSession(defaultPeriod);
   const [settings, setSettings] = useState({ rate: 0.85, voiceURI: "" });
   const [settingsReady, setSettingsReady] = useState(false);
+  const {
+    scheduleSettings,
+    scheduleReady,
+    updateScheduleSettings,
+    resetScheduleSettings,
+  } = useScheduleSettings();
   const updateSettings = useCallback((updater) => {
     setSettings((current) => {
       const next = typeof updater === "function" ? updater(current) : updater;
@@ -1735,8 +1952,8 @@ export default function App() {
   const view = session.view;
   const activePeriod = session.activePeriod;
   const dailyPace = useMemo(
-    () => calculateDailyProgress(data, store.progress),
-    [data, store.progress],
+    () => calculateDailyProgress(data, store.progress, new Date(), scheduleSettings),
+    [data, store.progress, scheduleSettings],
   );
   useEffect(() => {
     loadStudyData()
@@ -1770,7 +1987,7 @@ export default function App() {
     );
     return () => cancelAnimationFrame(frame);
   }, [sessionReady, view]);
-  if (loading || !sessionReady || !settingsReady || !store.ready)
+  if (loading || !sessionReady || !settingsReady || !scheduleReady || !store.ready)
     return (
       <div className="loading-screen">
         <b>日語階梯</b>
@@ -1866,6 +2083,9 @@ export default function App() {
             <SettingsView
               settings={settings}
               setSettings={updateSettings}
+              scheduleSettings={scheduleSettings}
+              setScheduleSettings={updateScheduleSettings}
+              resetScheduleSettings={resetScheduleSettings}
               drive={drive}
               onRestored={() => {
                 localStorage.removeItem("nihongo-stairs-ui-session");
