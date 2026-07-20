@@ -1149,6 +1149,9 @@ function MockView({
     (item) => item.id === review?.examId,
   );
   const questions = exam?.questions || [];
+  const answeredCount = Object.keys(answers).length;
+  const totalQuestions = questions.length;
+  const unansweredCount = Math.max(0, totalQuestions - answeredCount);
   const startedAt = pageState.startedAt ? Number(pageState.startedAt) : null;
   const [clock, setClock] = useState(Date.now());
   useEffect(() => {
@@ -1160,8 +1163,12 @@ function MockView({
   const seconds = startedAt
     ? Math.max(0, Math.floor((clock - startedAt) / 1000))
     : Number(review?.seconds) || 0;
+  function scrollToQuestion(index) {
+    document
+      .getElementById(`exam-question-${index + 1}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   async function finish() {
-    const answeredCount = Object.keys(answers).length;
     if (
       answeredCount < questions.length &&
       !window.confirm(
@@ -1195,7 +1202,6 @@ function MockView({
     window.scrollTo(0, 0);
   }
   function cancelExam() {
-    const answeredCount = Object.keys(answers).length;
     if (
       answeredCount > 0 &&
       !window.confirm("確定要取消本次作答嗎？目前答案會被清除，且不會留下成績。")
@@ -1287,14 +1293,29 @@ function MockView({
   }
   if (exam)
     return (
-      <section>
+      <section className="mock-exam-section">
         <PageTitle
           eyebrow="SIMULATION"
           title={exam.title}
           text={`自編模擬試驗 · ${exam.durationMinutes} 分鐘 · ${exam.questionCount} 題 · 及格 ${exam.threshold} 分`}
         />
-        <div className="exam-clock">
-          {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+        <div className="exam-control-bar" aria-label="模考作答狀態與操作">
+          <button type="button" onClick={cancelExam}>
+            取消作答
+          </button>
+          <div className="exam-control-title">
+            <strong>{exam.title}</strong>
+            <span>
+              已答 {answeredCount} · 未答 {unansweredCount} · 共{" "}
+              {totalQuestions} 題
+            </span>
+          </div>
+          <div className="exam-control-clock">
+            {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
+          </div>
+          <button className="primary" type="button" onClick={finish}>
+            {unansweredCount ? "提前交卷" : "答案を提出する（交卷）"}
+          </button>
         </div>
         <div className="exam-notice">
           <b>受験上の注意</b>
@@ -1302,9 +1323,57 @@ function MockView({
             問題と選択肢はすべて日本語です。最もよい答えを一つ選んでください。解説は答案を提出した後に表示されます。
           </p>
         </div>
-        <div className="exam-sheet">
+        <div className="exam-layout">
+          <aside className="exam-answer-card" aria-label="答題卡">
+            <div className="answer-card-head">
+              <div>
+                <span className="eyebrow">ANSWER CARD</span>
+                <h3>答題卡</h3>
+              </div>
+              <strong>共 {totalQuestions} 題</strong>
+            </div>
+            <div className="answer-card-stats">
+              <article>
+                <span>已答題</span>
+                <strong>{answeredCount}</strong>
+              </article>
+              <article>
+                <span>未答題</span>
+                <strong>{unansweredCount}</strong>
+              </article>
+              <article>
+                <span>總題數</span>
+                <strong>{totalQuestions}</strong>
+              </article>
+            </div>
+            <div className="answer-card-grid">
+              {questions.map((question, index) => {
+                const answered = answers[index] !== undefined;
+                return (
+                  <button
+                    key={question.id}
+                    type="button"
+                    className={answered ? "answered" : "unanswered"}
+                    onClick={() => scrollToQuestion(index)}
+                    aria-label={`第 ${index + 1} 題，${answered ? "已答" : "未答"}`}
+                  >
+                    {index + 1}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="answer-card-legend">
+              <span>
+                <i className="answered" /> 已答
+              </span>
+              <span>
+                <i className="unanswered" /> 未答
+              </span>
+            </div>
+          </aside>
+          <div className="exam-sheet">
           {questions.map((question, index) => (
-            <fieldset key={question.id}>
+            <fieldset key={question.id} id={`exam-question-${index + 1}`}>
               <div className="question-meta">
                 <span>{question.section}</span>
                 <b>{question.type}</b>
@@ -1352,14 +1421,13 @@ function MockView({
               取消作答
             </button>
             <button className="primary" type="button" onClick={finish}>
-              {Object.keys(answers).length < questions.length
-                ? "提前交卷"
-                : "答案を提出する（交卷）"}
+              {unansweredCount ? "提前交卷" : "答案を提出する（交卷）"}
             </button>
           </div>
           <p className="answer-count">
-            回答済み：{Object.keys(answers).length} / {questions.length}
+            已答：{answeredCount} / {totalQuestions}，未答：{unansweredCount}
           </p>
+        </div>
         </div>
       </section>
     );

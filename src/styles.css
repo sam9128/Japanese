@@ -841,14 +841,142 @@ a {
   margin-top: 20px;
   color: var(--green);
 }
-.exam-clock {
-  position: fixed;
-  right: 25px;
-  top: 85px;
+.exam-control-bar {
+  position: sticky;
+  top: 72px;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 28px rgba(34, 55, 43, 0.08);
+  backdrop-filter: blur(10px);
+}
+.exam-control-bar button {
+  border: 1px solid var(--green);
+  background: #fff;
+  color: var(--green);
+  padding: 10px 16px;
+  cursor: pointer;
+}
+.exam-control-title strong,
+.exam-control-title span {
+  display: block;
+}
+.exam-control-title strong {
+  color: var(--green);
+  font: 700 18px "Noto Serif JP";
+}
+.exam-control-title span {
+  margin-top: 2px;
+  color: #68736a;
+  font-size: 12px;
+}
+.exam-control-clock {
+  min-width: 82px;
+  padding: 10px 14px;
   background: var(--green);
   color: #fff;
-  padding: 12px 17px;
-  z-index: 10;
+  text-align: center;
+  font-weight: 700;
+}
+.exam-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 800px);
+  align-items: start;
+  gap: 18px;
+}
+.exam-answer-card {
+  position: sticky;
+  top: 150px;
+  background: #fff;
+  border: 1px solid var(--line);
+  padding: 18px;
+  box-shadow: 0 10px 35px rgba(34, 55, 43, 0.04);
+}
+.answer-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 13px;
+}
+.answer-card-head h3 {
+  margin: 4px 0 0;
+  color: var(--green);
+  font: 700 20px "Noto Serif JP";
+}
+.answer-card-head > strong {
+  color: #59645d;
+  font-size: 12px;
+}
+.answer-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin-bottom: 15px;
+}
+.answer-card-stats article {
+  padding: 9px;
+  background: #f7f8f4;
+  text-align: center;
+}
+.answer-card-stats span {
+  display: block;
+  color: #6d786f;
+  font-size: 10px;
+}
+.answer-card-stats strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--green);
+  font: 700 19px "Noto Serif JP";
+}
+.answer-card-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.answer-card-grid button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  font-weight: 700;
+}
+.answer-card-grid button.answered,
+.answer-card-legend i.answered {
+  background: #dceee2;
+  color: #2e6849;
+  border-color: #9fd1b2;
+}
+.answer-card-grid button.unanswered,
+.answer-card-legend i.unanswered {
+  background: #f8e9e6;
+  color: #984434;
+  border-color: #e6b1aa;
+}
+.answer-card-grid button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(34, 55, 43, 0.1);
+}
+.answer-card-legend {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 13px;
+  color: #68736a;
+  font-size: 12px;
+}
+.answer-card-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  vertical-align: -1px;
 }
 .exam-sheet {
   max-width: 800px;
@@ -1469,8 +1597,37 @@ a {
   .bottom-nav span {
     display: block;
   }
-  .exam-clock {
-    top: 67px;
+  .exam-control-bar {
+    top: 60px;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 10px;
+  }
+  .exam-control-title {
+    grid-column: 1/-1;
+    order: -1;
+  }
+  .exam-control-title strong {
+    font-size: 15px;
+  }
+  .exam-control-bar button,
+  .exam-control-clock {
+    width: 100%;
+    margin: 0;
+  }
+  .exam-layout {
+    grid-template-columns: 1fr;
+  }
+  .exam-answer-card {
+    position: static;
+    padding: 14px;
+  }
+  .answer-card-grid {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
+  }
+  .answer-card-grid button {
+    min-height: 32px;
   }
   .empty {
     padding: 40px 12px;
