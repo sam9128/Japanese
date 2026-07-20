@@ -1,4 +1,4 @@
-const CACHE = "nihongo-stairs-v23-compact-mobile-exam";
+const CACHE = "nihongo-stairs-v24-exam-result-states";
 const PERIODS = [
   "115-07",
   "115-08",

@@ -1133,6 +1133,128 @@ function MediaView({
   );
 }
 
+function ExamAnswerCard({
+  questions,
+  answers,
+  mode = "practice",
+  onJump,
+  answeredCount,
+  totalQuestions,
+  unansweredCount,
+}) {
+  const resultStats = mode === "review"
+    ? questions.reduce(
+        (stats, question, index) => {
+          if (answers[index] === question.answer) stats.correct += 1;
+          else stats.wrong += 1;
+          return stats;
+        },
+        { correct: 0, wrong: 0 },
+      )
+    : null;
+  return (
+    <aside
+      className={`exam-answer-card ${mode === "review" ? "is-review" : ""}`}
+      aria-label={mode === "review" ? "成績答題卡" : "答題卡"}
+    >
+      <div className="answer-card-head">
+        <div>
+          <span className="eyebrow">ANSWER CARD</span>
+          <h3>{mode === "review" ? "成績答題卡" : "答題卡"}</h3>
+        </div>
+        <strong>共 {totalQuestions} 題</strong>
+      </div>
+      <div className="answer-card-stats">
+        {mode === "review" ? (
+          <>
+            <article>
+              <span>正確</span>
+              <strong>{resultStats.correct}</strong>
+            </article>
+            <article>
+              <span>錯誤</span>
+              <strong>{resultStats.wrong}</strong>
+            </article>
+            <article>
+              <span>總題數</span>
+              <strong>{totalQuestions}</strong>
+            </article>
+          </>
+        ) : (
+          <>
+            <article>
+              <span>已答題</span>
+              <strong>{answeredCount}</strong>
+            </article>
+            <article>
+              <span>未答題</span>
+              <strong>{unansweredCount}</strong>
+            </article>
+            <article>
+              <span>總題數</span>
+              <strong>{totalQuestions}</strong>
+            </article>
+          </>
+        )}
+      </div>
+      <div className="answer-card-grid">
+        {questions.map((question, index) => {
+          const hasAnswer = answers[index] !== undefined;
+          const correct = answers[index] === question.answer;
+          const status =
+            mode === "review"
+              ? correct
+                ? "correct"
+                : "wrong"
+              : hasAnswer
+                ? "answered"
+                : "unanswered";
+          return (
+            <button
+              key={question.id}
+              type="button"
+              className={status}
+              onClick={() => onJump?.(index)}
+              aria-label={`第 ${index + 1} 題，${
+                mode === "review"
+                  ? correct
+                    ? "正確"
+                    : "錯誤"
+                  : hasAnswer
+                    ? "已答"
+                    : "未答"
+              }`}
+            >
+              {index + 1}
+            </button>
+          );
+        })}
+      </div>
+      <div className="answer-card-legend">
+        {mode === "review" ? (
+          <>
+            <span>
+              <i className="correct" /> 正確
+            </span>
+            <span>
+              <i className="wrong" /> 錯誤
+            </span>
+          </>
+        ) : (
+          <>
+            <span>
+              <i className="answered" /> 已答
+            </span>
+            <span>
+              <i className="unanswered" /> 未答
+            </span>
+          </>
+        )}
+      </div>
+    </aside>
+  );
+}
+
 function MockView({
   data,
   activePeriod,
@@ -1168,6 +1290,11 @@ function MockView({
       .getElementById(`exam-question-${index + 1}`)
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+  function scrollToReviewQuestion(index) {
+    document
+      .getElementById(`review-question-${index + 1}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   async function finish() {
     if (
       answeredCount < questions.length &&
@@ -1188,6 +1315,7 @@ function MockView({
       score,
       seconds: finishedSeconds,
       answeredCount,
+      answers,
       submittedEarly: answeredCount < questions.length,
       completedAt: new Date().toISOString(),
     });
@@ -1228,6 +1356,9 @@ function MockView({
   }
   if (review && reviewExam) {
     const reviewQuestions = reviewExam.questions;
+    const reviewAnswers = review.answers || {};
+    const reviewTotal = reviewQuestions.length;
+    const reviewAnswered = Object.keys(reviewAnswers).length;
     return (
       <section>
         <PageTitle
@@ -1244,9 +1375,23 @@ function MockView({
             秒
           </span>
         </div>
+        <div className="exam-layout review-layout">
+          <ExamAnswerCard
+            questions={reviewQuestions}
+            answers={reviewAnswers}
+            mode="review"
+            onJump={scrollToReviewQuestion}
+            answeredCount={reviewAnswered}
+            totalQuestions={reviewTotal}
+            unansweredCount={Math.max(0, reviewTotal - reviewAnswered)}
+          />
         <div className="exam-review">
           {reviewQuestions.map((question, index) => (
-            <article key={question.id} className="review-item">
+            <article
+              key={question.id}
+              id={`review-question-${index + 1}`}
+              className="review-item"
+            >
               <span>
                 {question.section} · 問題 {index + 1}
               </span>
@@ -1270,7 +1415,7 @@ function MockView({
                     className={
                       optionIndex === question.answer
                         ? "correct"
-                        : optionIndex === review.answers[index]
+                        : optionIndex === reviewAnswers[index]
                           ? "wrong"
                           : ""
                     }
@@ -1284,6 +1429,7 @@ function MockView({
               </p>
             </article>
           ))}
+        </div>
         </div>
         <button className="primary" onClick={leaveReview}>
           返回模考列表

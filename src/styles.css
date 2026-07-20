@@ -949,13 +949,25 @@ a {
 }
 .answer-card-grid button.answered,
 .answer-card-legend i.answered {
-  background: #dceee2;
-  color: #2e6849;
-  border-color: #9fd1b2;
+  background: #f4efe4 !important;
+  color: var(--green);
+  border-color: var(--moss);
 }
 .answer-card-grid button.unanswered,
 .answer-card-legend i.unanswered {
-  background: #f8e9e6;
+  background: #fff !important;
+  color: #7a847d;
+  border-color: var(--line);
+}
+.answer-card-grid button.correct,
+.answer-card-legend i.correct {
+  background: #dceee2 !important;
+  color: #2e6849;
+  border-color: #9fd1b2;
+}
+.answer-card-grid button.wrong,
+.answer-card-legend i.wrong {
+  background: #f8e9e6 !important;
   color: #984434;
   border-color: #e6b1aa;
 }
@@ -979,19 +991,24 @@ a {
   vertical-align: -1px;
 }
 .exam-sheet {
+  min-width: 0;
   max-width: 800px;
   background: #fff;
   border: 1px solid var(--line);
   padding: 28px;
+  overflow-x: hidden;
 }
 .exam-sheet fieldset {
+  min-width: 0;
   border: 0;
   border-bottom: 1px solid var(--line);
   padding: 18px 0;
+  scroll-margin-top: 132px;
 }
 .exam-sheet label {
   display: block;
   margin: 9px;
+  min-width: 0;
 }
 .primary,
 .assessment-grid button:hover {
@@ -1634,13 +1651,20 @@ a {
   .exam-layout {
     grid-template-columns: 1fr;
     gap: 8px;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
   }
   .exam-answer-card {
     position: sticky;
     top: 111px;
     z-index: 12;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     padding: 8px;
     margin: 0 -4px 8px;
+    overflow: hidden;
     box-shadow: 0 6px 18px rgba(34, 55, 43, 0.06);
   }
   .answer-card-head,
@@ -1651,10 +1675,13 @@ a {
   }
   .answer-card-grid {
     display: flex;
+    max-width: 100%;
     overflow-x: auto;
+    overflow-y: hidden;
     gap: 6px;
     padding-bottom: 2px;
     scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
   }
   .answer-card-grid button {
     flex: 0 0 32px;
@@ -1663,6 +1690,28 @@ a {
   }
   .mock-exam-section .page-title {
     margin-bottom: 8px;
+  }
+  .mock-exam-section {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  .mock-exam-section .exam-sheet {
+    width: 100%;
+    max-width: 100%;
+    padding: 14px;
+    box-sizing: border-box;
+  }
+  .exam-sheet legend,
+  .exam-instruction,
+  .exam-passage,
+  .exam-sheet fieldset > label {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .exam-passage {
+    max-height: 42vh;
+    overflow: auto;
   }
   .empty {
     padding: 40px 12px;
@@ -1819,11 +1868,13 @@ body {
   color: #5d6d63;
 }
 .exam-passage {
+  max-width: 100%;
   white-space: pre-line;
   background: #f5f7f2;
   border-left: 3px solid var(--moss);
   padding: 15px;
   line-height: 1.9;
+  overflow-wrap: anywhere;
 }
 .exam-sheet fieldset > label {
   display: grid;
@@ -1831,6 +1882,8 @@ body {
   gap: 7px;
   align-items: start;
   padding: 7px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .exam-sheet fieldset > label span {
   display: inline-grid;
