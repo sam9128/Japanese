@@ -1,4 +1,4 @@
-const CACHE = "nihongo-stairs-v29-media-prev-next";
+const CACHE = "nihongo-stairs-v30-global-topbar-collapse";
 const PERIODS = [
   "115-07",
   "115-08",

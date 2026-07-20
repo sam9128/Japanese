@@ -47,6 +47,13 @@ a {
   z-index: 40;
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
+.topbar-collapsed .topbar {
+  transform: translateY(-100%);
+  box-shadow: none;
+}
+.topbar-collapsed .exam-control-bar {
+  top: 0;
+}
 .brand {
   border: 0;
   background: none;
@@ -1441,10 +1448,6 @@ a {
   .topbar {
     height: 60px;
     padding: 0 17px;
-  }
-  .topbar-collapsed .topbar {
-    transform: translateY(-100%);
-    box-shadow: none;
   }
   .brand {
     font-size: 18px;

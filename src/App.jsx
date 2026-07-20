@@ -2585,9 +2585,8 @@ export default function App() {
   useEffect(() => {
     let previousY = window.scrollY;
     const update = () => {
-      const mobile = window.matchMedia("(max-width: 700px)").matches;
       const currentY = window.scrollY;
-      if (!mobile || menuOpen || currentY < 24) {
+      if (menuOpen || currentY < 24) {
         setTopbarCollapsed(false);
         previousY = currentY;
         return;
