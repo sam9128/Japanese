@@ -1,6 +1,7 @@
 const STATUS_LABELS = {
   idle: "尚未連結",
   connecting: "正在連結…",
+  restoring: "正在恢復連線…",
   syncing: "同步中…",
   synced: "已同步",
   offline: "離線，連線後可再同步",
@@ -37,7 +38,7 @@ export default function DriveSyncPanel({ drive }) {
         {!drive.connected ? (
           <button
             className="primary"
-            disabled={drive.status === "connecting"}
+            disabled={["connecting", "restoring"].includes(drive.status)}
             onClick={() => void drive.connect()}
           >
             連結 Google 雲端硬碟

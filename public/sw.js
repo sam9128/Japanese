@@ -1,4 +1,4 @@
-const CACHE = "nihongo-stairs-v30-global-topbar-collapse";
+const CACHE = "nihongo-stairs-v31-drive-auth-restore";
 const PERIODS = [
   "115-07",
   "115-08",

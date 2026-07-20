@@ -46,7 +46,7 @@ export function loadGoogleIdentityServices() {
   return gisPromise;
 }
 
-export async function requestDriveAccessToken() {
+export async function requestDriveAccessToken({ prompt = "" } = {}) {
   if (!GOOGLE_CLIENT_ID) throw new Error("尚未設定 Google OAuth Client ID。");
   const google = await loadGoogleIdentityServices();
   return new Promise((resolve, reject) => {
@@ -80,7 +80,7 @@ export async function requestDriveAccessToken() {
           ),
         ),
     });
-    client.requestAccessToken({ prompt: "" });
+    client.requestAccessToken({ prompt });
   });
 }
 

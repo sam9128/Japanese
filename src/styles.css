@@ -1368,7 +1368,11 @@ a {
   background: #3f8b59;
 }
 .account-chip.syncing i,
-.sync-state.syncing i {
+.account-chip.connecting i,
+.account-chip.restoring i,
+.sync-state.syncing i,
+.sync-state.connecting i,
+.sync-state.restoring i {
   background: var(--gold);
   animation: pulse 1s infinite;
 }
