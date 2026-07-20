@@ -18,6 +18,7 @@ import {
 import { getJapaneseVoices, speakJapanese, stopSpeech } from "./speech";
 import { calculateDailyProgress } from "./dailyProgress";
 import DriveSyncPanel from "./DriveSyncPanel";
+import { buildStudyQuiz, rememberQuizRound } from "./studyQuiz";
 import {
   DEFAULT_SCHEDULE_SETTINGS,
   normalizeScheduleSettings,
@@ -44,7 +45,14 @@ const EMPTY = {
 const STRONG_RATINGS = new Set(["good", "easy"]);
 const LIBRARY_PAGE_SIZES = [30, 60, 120];
 const DEFAULT_PAGE_STATES = {
-  today: { index: 0, revealed: false, scrollY: 0 },
+  today: {
+    index: 0,
+    revealed: false,
+    scrollY: 0,
+    seenByBatch: {},
+    quiz: null,
+    recentQuizRounds: [],
+  },
   library: {
     query: "",
     type: "vocabulary",
@@ -181,6 +189,94 @@ function buildDailyBatches(vocabulary, grammar) {
   ]).filter((batch) => batch.length);
 }
 
+function StudyQuizPanel({
+  quiz,
+  settings,
+  onAnswer,
+  onNext,
+  onFinish,
+}) {
+  const questions = quiz?.questions || [];
+  const currentIndex = Math.min(quiz?.current || 0, questions.length - 1);
+  const question = questions[currentIndex];
+  const answers = quiz?.answers || {};
+  const answer = answers[currentIndex];
+  const answeredCount = Object.keys(answers).length;
+  const correctCount = Object.values(answers).filter((item) => item.correct)
+    .length;
+  const finished = questions.length > 0 && answeredCount >= questions.length;
+  if (!question) return null;
+  return (
+    <div className="lesson-card study-quiz-card">
+      <div className="lesson-top">
+        <span>
+          3 題小測驗 · 第 {currentIndex + 1} / {questions.length} 題
+        </span>
+        <button onClick={() => speakJapanese(question.audioText, settings)}>
+          播放題目
+        </button>
+      </div>
+      <div className="study-quiz-main">
+        <div className="study-quiz-prompt">
+          <span className="quiz-type">
+            {question.category === "grammar" ? "文法" : "單字"}
+          </span>
+          <h2>{question.term}</h2>
+          <p className="reading">{question.reading}</p>
+          <p>請選出最接近的中文意思。</p>
+        </div>
+        <div className="study-quiz-options">
+          {question.options.map((option, optionIndex) => {
+            const isSelected = answer?.selectedIndex === optionIndex;
+            const isCorrect = question.correctIndex === optionIndex;
+            const stateClass = answer
+              ? isCorrect
+                ? "correct"
+                : isSelected
+                  ? "wrong"
+                  : ""
+              : "";
+            return (
+              <button
+                key={`${question.itemId}:${option}`}
+                className={`${isSelected ? "selected" : ""} ${stateClass}`}
+                disabled={Boolean(answer)}
+                onClick={() => onAnswer(optionIndex)}
+              >
+                <b>{String.fromCharCode(65 + optionIndex)}</b>
+                <span>{option}</span>
+              </button>
+            );
+          })}
+        </div>
+        {answer && (
+          <div
+            className={`study-quiz-feedback ${
+              answer.correct ? "correct" : "wrong"
+            }`}
+            role="status"
+          >
+            <strong>{answer.correct ? "答對了" : "這題要再加強"}</strong>
+            <span>正確意思：{question.correctMeaning}</span>
+          </div>
+        )}
+      </div>
+      <footer className="study-quiz-footer">
+        <span>
+          已答 {answeredCount} · 正確 {correctCount} · 共 {questions.length}
+        </span>
+        {finished ? (
+          <button onClick={onFinish}>回到卡片</button>
+        ) : (
+          <button disabled={!answer} onClick={onNext}>
+            下一題
+          </button>
+        )}
+      </footer>
+    </div>
+  );
+}
+
 function useLearningStore() {
   const [progress, setProgress] = useState({});
   const [events, setEvents] = useState([]);
@@ -204,10 +300,12 @@ function useLearningStore() {
     return () => window.removeEventListener(REMOTE_APPLIED_EVENT, load);
   }, [load]);
   async function rate(item, rating, detail = {}) {
+    const previous = progress[item.id] || {};
     const record = {
+      ...previous,
       id: item.id,
       rating,
-      attempts: (progress[item.id]?.attempts || 0) + 1,
+      attempts: (previous.attempts || 0) + 1,
       updatedAt: new Date().toISOString(),
     };
     const event = {
@@ -216,6 +314,33 @@ function useLearningStore() {
       category: item.category,
       rating,
       occurredAt: record.updatedAt,
+      ...detail,
+    };
+    await Promise.all([put("cardProgress", record), put("studyEvents", event)]);
+    setProgress((old) => ({ ...old, [item.id]: record }));
+    setEvents((old) => [...old, event]);
+  }
+  async function recordQuizAnswer(item, correct, detail = {}) {
+    const previous = progress[item.id] || {};
+    const now = new Date().toISOString();
+    const record = {
+      ...previous,
+      id: item.id,
+      quizAttempts: (previous.quizAttempts || 0) + 1,
+      quizCorrect: (previous.quizCorrect || 0) + (correct ? 1 : 0),
+      quizWrong: (previous.quizWrong || 0) + (correct ? 0 : 1),
+      lastQuizCorrect: correct,
+      lastQuizAt: now,
+      updatedAt: now,
+    };
+    const event = {
+      id: crypto.randomUUID(),
+      cardId: item.id,
+      category: item.category,
+      type: "quiz",
+      rating: correct ? "quiz-correct" : "quiz-wrong",
+      quizCorrect: correct,
+      occurredAt: now,
       ...detail,
     };
     await Promise.all([put("cardProgress", record), put("studyEvents", event)]);
@@ -232,6 +357,7 @@ function useLearningStore() {
     results,
     ready,
     rate,
+    recordQuizAnswer,
     saveResult,
     reload: () => location.reload(),
   };
@@ -473,12 +599,151 @@ function TodayView({
   const [notice, setNotice] = useState("");
   const card = cards[index % Math.max(1, cards.length)];
   const batchKey = `${activePeriod}:${batchIndex}`;
+  const activeQuiz =
+    pageState.quiz?.batchKey === batchKey ? pageState.quiz : null;
+  const seenByBatch = pageState.seenByBatch || {};
+  const currentSeenIds = seenByBatch[batchKey] || [];
+  const quizCandidates = useMemo(
+    () => [...unlocked.v, ...unlocked.g],
+    [unlocked.v, unlocked.g],
+  );
+  const quizItemsById = useMemo(
+    () => new Map(quizCandidates.map((item) => [item.id, item])),
+    [quizCandidates],
+  );
+  const learnedQuizPool = useMemo(() => {
+    const seenIds = new Set(currentSeenIds);
+    return quizCandidates.filter(
+      (item) => store.progress[item.id] || seenIds.has(item.id),
+    );
+  }, [quizCandidates, store.progress, currentSeenIds]);
   const previousBatchKey = useRef(batchKey);
   useEffect(() => {
     if (previousBatchKey.current !== batchKey) {
-      updatePage((current) => ({ ...current, index: 0, revealed: false }));
+      updatePage((current) => ({
+        ...current,
+        index: 0,
+        revealed: false,
+        quiz: null,
+      }));
       previousBatchKey.current = batchKey;
     }
+  }, [batchKey, updatePage]);
+  const markCardSeen = useCallback(
+    (itemId) => {
+      if (!itemId) return;
+      updatePage((current) => {
+        const nextSeenByBatch = { ...(current.seenByBatch || {}) };
+        const batchSeen = new Set(nextSeenByBatch[batchKey] || []);
+        if (batchSeen.has(itemId)) return current;
+        batchSeen.add(itemId);
+        nextSeenByBatch[batchKey] = [...batchSeen];
+        return { ...current, seenByBatch: nextSeenByBatch };
+      });
+    },
+    [batchKey, updatePage],
+  );
+  useEffect(() => {
+    markCardSeen(card?.id);
+  }, [card?.id, markCardSeen]);
+  useEffect(() => {
+    if (!cards.length || activeQuiz) return;
+    const seenIds = new Set(currentSeenIds);
+    if (!cards.every((item) => seenIds.has(item.id))) return;
+    const questions = buildStudyQuiz({
+      pool: learnedQuizPool,
+      allCandidates: quizCandidates,
+      progress: store.progress,
+      recentQuizRounds: pageState.recentQuizRounds || [],
+    });
+    if (!questions.length) return;
+    updatePage((current) => {
+      if (current.quiz?.batchKey === batchKey) return current;
+      return {
+        ...current,
+        quiz: {
+          id: crypto.randomUUID(),
+          batchKey,
+          questions,
+          current: 0,
+          answers: {},
+          startedAt: new Date().toISOString(),
+        },
+      };
+    });
+  }, [
+    activeQuiz,
+    batchKey,
+    cards,
+    currentSeenIds,
+    learnedQuizPool,
+    pageState.recentQuizRounds,
+    quizCandidates,
+    store.progress,
+    updatePage,
+  ]);
+  const answerQuiz = useCallback(
+    async (selectedIndex) => {
+      const quiz = pageState.quiz;
+      const currentIndex = quiz?.current || 0;
+      const question = quiz?.questions?.[currentIndex];
+      if (!question || quiz.answers?.[currentIndex]) return;
+      const correct = selectedIndex === question.correctIndex;
+      const answeredAt = new Date().toISOString();
+      updatePage((current) => {
+        if (current.quiz?.id !== quiz.id) return current;
+        return {
+          ...current,
+          quiz: {
+            ...current.quiz,
+            answers: {
+              ...(current.quiz.answers || {}),
+              [currentIndex]: { selectedIndex, correct, answeredAt },
+            },
+          },
+        };
+      });
+      const item = quizItemsById.get(question.itemId);
+      if (item) {
+        await store.recordQuizAnswer(item, correct, {
+          selectedOption: question.options[selectedIndex],
+          correctOption: question.correctMeaning,
+          quizRoundId: quiz.id,
+          quizQuestion: currentIndex + 1,
+        });
+      }
+    },
+    [pageState.quiz, quizItemsById, store, updatePage],
+  );
+  const nextQuizQuestion = useCallback(() => {
+    updatePage((current) => {
+      if (!current.quiz) return current;
+      const maxIndex = Math.max(0, (current.quiz.questions || []).length - 1);
+      return {
+        ...current,
+        quiz: {
+          ...current.quiz,
+          current: Math.min((current.quiz.current || 0) + 1, maxIndex),
+        },
+      };
+    });
+  }, [updatePage]);
+  const finishQuiz = useCallback(() => {
+    updatePage((current) => {
+      const itemIds = current.quiz?.questions?.map((question) => question.itemId);
+      const nextSeenByBatch = { ...(current.seenByBatch || {}) };
+      nextSeenByBatch[batchKey] = [];
+      return {
+        ...current,
+        quiz: null,
+        revealed: false,
+        seenByBatch: nextSeenByBatch,
+        recentQuizRounds: rememberQuizRound(
+          current.recentQuizRounds || [],
+          itemIds || [],
+        ),
+      };
+    });
   }, [batchKey, updatePage]);
   async function rate(value) {
     const willAdvance =
@@ -552,7 +817,16 @@ function TodayView({
         </div>
       )}
       <div className="dashboard-grid">
-        <div className="lesson-card">
+        {activeQuiz ? (
+          <StudyQuizPanel
+            quiz={activeQuiz}
+            settings={settings}
+            onAnswer={answerQuiz}
+            onNext={nextQuizQuestion}
+            onFinish={finishQuiz}
+          />
+        ) : (
+          <div className="lesson-card">
           <div className="lesson-top">
             <span>
               {card.level} · {card.category === "vocab" ? "單字" : "文法"}
@@ -621,7 +895,8 @@ function TodayView({
               下一張 →
             </button>
           </footer>
-        </div>
+          </div>
+        )}
         <aside className="today-side">
           <h3>接下來</h3>
           <button className="task" onClick={() => goMedia("reading")}>

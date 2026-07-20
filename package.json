@@ -16,7 +16,8 @@
     "validate:vocab-translations": "node scripts/validate-vocab-translations.mjs",
     "validate:grammar": "node scripts/validate-grammar-content.mjs",
     "validate:progress": "node scripts/validate-daily-progress.mjs",
-    "validate:sync": "node scripts/validate-sync.mjs"
+    "validate:sync": "node scripts/validate-sync.mjs",
+    "validate:study-quiz": "node scripts/validate-study-quiz.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
