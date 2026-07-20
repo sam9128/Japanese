@@ -1076,6 +1076,11 @@ a {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(34, 55, 43, 0.1);
 }
+.answer-card-grid button.current {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(199, 154, 76, 0.18);
+}
 .answer-card-legend {
   display: flex;
   justify-content: flex-end;

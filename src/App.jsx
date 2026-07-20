@@ -1413,6 +1413,8 @@ function ExamAnswerCard({
   answers,
   mode = "practice",
   onJump,
+  currentIndex = null,
+  statusPrefix = "exam-status",
   answeredCount,
   totalQuestions,
   unansweredCount,
@@ -1487,8 +1489,10 @@ function ExamAnswerCard({
           return (
             <button
               key={question.id}
+              id={`${statusPrefix}-${index + 1}`}
               type="button"
-              className={status}
+              className={`${status} ${currentIndex === index ? "current" : ""}`}
+              aria-current={currentIndex === index ? "true" : undefined}
               onClick={() => onJump?.(index)}
               aria-label={`第 ${index + 1} 題，${
                 mode === "review"
@@ -1550,6 +1554,7 @@ function MockView({
   const totalQuestions = questions.length;
   const unansweredCount = Math.max(0, totalQuestions - answeredCount);
   const startedAt = pageState.startedAt ? Number(pageState.startedAt) : null;
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [clock, setClock] = useState(Date.now());
   useEffect(() => {
     if (!startedAt) return;
@@ -1557,18 +1562,48 @@ function MockView({
     const id = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(id);
   }, [startedAt]);
+  useEffect(() => {
+    setCurrentQuestionIndex(0);
+  }, [exam?.id, review?.examId]);
   const seconds = startedAt
     ? Math.max(0, Math.floor((clock - startedAt) / 1000))
     : Number(review?.seconds) || 0;
+  function scrollToMobileAnswerStatus(index, prefix = "practice-answer") {
+    if (!window.matchMedia("(max-width: 760px)").matches) return;
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`${prefix}-${index + 1}`)
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "center",
+        });
+    });
+  }
   function scrollToQuestion(index) {
+    setCurrentQuestionIndex(index);
+    scrollToMobileAnswerStatus(index);
     document
       .getElementById(`exam-question-${index + 1}`)
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   function scrollToReviewQuestion(index) {
+    setCurrentQuestionIndex(index);
+    scrollToMobileAnswerStatus(index, "review-answer");
     document
       .getElementById(`review-question-${index + 1}`)
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function answerQuestion(index, optionIndex) {
+    setCurrentQuestionIndex(index);
+    updatePage((current) => ({
+      ...current,
+      answers: {
+        ...(current.answers || {}),
+        [index]: optionIndex,
+      },
+    }));
+    scrollToMobileAnswerStatus(index);
   }
   async function finish() {
     if (
@@ -1656,6 +1691,8 @@ function MockView({
             answers={reviewAnswers}
             mode="review"
             onJump={scrollToReviewQuestion}
+            currentIndex={currentQuestionIndex}
+            statusPrefix="review-answer"
             answeredCount={reviewAnswered}
             totalQuestions={reviewTotal}
             unansweredCount={Math.max(0, reviewTotal - reviewAnswered)}
@@ -1743,6 +1780,8 @@ function MockView({
               answers={answers}
               mode="practice"
               onJump={scrollToQuestion}
+              currentIndex={currentQuestionIndex}
+              statusPrefix="practice-answer"
               answeredCount={answeredCount}
               totalQuestions={totalQuestions}
               unansweredCount={unansweredCount}
@@ -1785,7 +1824,12 @@ function MockView({
                   <button
                     key={question.id}
                     type="button"
-                    className={answered ? "answered" : "unanswered"}
+                    className={`${answered ? "answered" : "unanswered"} ${
+                      currentQuestionIndex === index ? "current" : ""
+                    }`}
+                    aria-current={
+                      currentQuestionIndex === index ? "true" : undefined
+                    }
                     onClick={() => scrollToQuestion(index)}
                     aria-label={`第 ${index + 1} 題，${answered ? "已答" : "未答"}`}
                   >
@@ -1832,15 +1876,7 @@ function MockView({
                     type="radio"
                     name={`q${index}`}
                     checked={answers[index] === optionIndex}
-                    onChange={() =>
-                      updatePage((current) => ({
-                        ...current,
-                        answers: {
-                          ...(current.answers || {}),
-                          [index]: optionIndex,
-                        },
-                      }))
-                    }
+                    onChange={() => answerQuestion(index, optionIndex)}
                   />
                   <span>{optionIndex + 1}</span>
                   {option}
