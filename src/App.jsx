@@ -1166,8 +1166,11 @@ function MediaView({
 }) {
   const type = pageState.type || "reading";
   const list = data[type].filter((x) => isUnlocked(x, activePeriod));
-  const selected = Number(pageState.selected) || 0;
-  const item = list[selected % Math.max(1, list.length)];
+  const rawSelected = Number(pageState.selected) || 0;
+  const selected = list.length
+    ? ((rawSelected % list.length) + list.length) % list.length
+    : 0;
+  const item = list[selected];
   const transcript = Boolean(pageState.transcript);
   const answer = pageState.answers?.[item?.id] ?? null;
   const replays = Number(pageState.replays) || 0;
@@ -1200,6 +1203,15 @@ function MediaView({
     (startedAt ? Math.max(0, Math.floor((clock - startedAt) / 1000)) : 0);
   if (!item) return <Empty text="這個月份尚無閱讀／聽力教材。" />;
   const question = item.questions[0];
+  const goToMediaItem = (nextIndex) =>
+    updatePage((current) => ({
+      ...current,
+      selected: (nextIndex + list.length) % list.length,
+      transcript: false,
+      replays: 0,
+      elapsed: 0,
+      startedAt: null,
+    }));
   const selectType = (nextType) =>
     updatePage((current) => ({
       ...current,
@@ -1401,6 +1413,25 @@ function MediaView({
                 {question.explanation}
               </p>
             )}
+          </div>
+          <div className="media-nav-actions" aria-label="閱讀聽力上下題">
+            <button
+              type="button"
+              disabled={list.length <= 1}
+              onClick={() => goToMediaItem(selected - 1)}
+            >
+              ← 上一題
+            </button>
+            <span>
+              {selected + 1} / {list.length}
+            </span>
+            <button
+              type="button"
+              disabled={list.length <= 1}
+              onClick={() => goToMediaItem(selected + 1)}
+            >
+              下一題 →
+            </button>
           </div>
         </article>
       </div>
