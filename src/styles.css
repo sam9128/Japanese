@@ -44,7 +44,8 @@ a {
   padding: 0 34px;
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: 40;
+  transition: transform 180ms ease, box-shadow 180ms ease;
 }
 .brand {
   border: 0;
@@ -884,6 +885,9 @@ a {
   text-align: center;
   font-weight: 700;
 }
+.exam-mobile-answer-strip {
+  display: none;
+}
 .exam-layout {
   display: grid;
   grid-template-columns: 260px minmax(0, 800px);
@@ -1304,6 +1308,10 @@ a {
     height: 60px;
     padding: 0 17px;
   }
+  .topbar-collapsed .topbar {
+    transform: translateY(-100%);
+    box-shadow: none;
+  }
   .brand {
     font-size: 18px;
   }
@@ -1617,9 +1625,12 @@ a {
   .exam-control-bar {
     top: 60px;
     grid-template-columns: auto minmax(0, 1fr) auto auto;
-    gap: 6px;
-    padding: 7px 8px;
+    gap: 3px;
+    padding: 3px 6px;
     margin: 0 -4px 8px;
+  }
+  .topbar-collapsed .exam-control-bar {
+    top: 0;
   }
   .exam-control-title {
     grid-column: auto;
@@ -1633,20 +1644,46 @@ a {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    font-size: 11px;
+    font-size: 10px;
   }
   .exam-control-bar button {
     width: auto;
-    min-width: 56px;
+    min-width: 48px;
+    height: 24px;
     margin: 0;
-    padding: 7px 8px;
-    font-size: 12px;
+    padding: 0 6px;
+    font-size: 11px;
+    line-height: 1;
   }
   .exam-control-clock {
-    min-width: 54px;
-    padding: 7px 8px;
+    min-width: 48px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
     margin: 0;
-    font-size: 12px;
+    font-size: 11px;
+    line-height: 1;
+  }
+  .exam-mobile-answer-strip {
+    display: block;
+    grid-column: 1/-1;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .exam-mobile-answer-strip .exam-answer-card {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+    overflow: hidden;
   }
   .exam-layout {
     grid-template-columns: 1fr;
@@ -1655,17 +1692,8 @@ a {
     max-width: 100%;
     overflow-x: hidden;
   }
-  .exam-answer-card {
-    position: sticky;
-    top: 111px;
-    z-index: 12;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    padding: 8px;
-    margin: 0 -4px 8px;
-    overflow: hidden;
-    box-shadow: 0 6px 18px rgba(34, 55, 43, 0.06);
+  .mock-exam-section .exam-layout > .exam-answer-card {
+    display: none;
   }
   .answer-card-head,
   .answer-card-stats,
@@ -1678,22 +1706,26 @@ a {
     max-width: 100%;
     overflow-x: auto;
     overflow-y: hidden;
-    gap: 6px;
+    gap: 5px;
     padding-bottom: 2px;
     scrollbar-width: thin;
     -webkit-overflow-scrolling: touch;
   }
   .answer-card-grid button {
-    flex: 0 0 32px;
-    min-height: 32px;
-    font-size: 12px;
+    flex: 0 0 27px;
+    min-height: 22px;
+    height: 22px;
+    font-size: 10px;
+    line-height: 1;
+  }
+  .mock-exam-section .exam-sheet fieldset {
+    scroll-margin-top: 120px;
   }
   .mock-exam-section .page-title {
     margin-bottom: 8px;
   }
   .mock-exam-section {
     max-width: 100%;
-    overflow-x: hidden;
   }
   .mock-exam-section .exam-sheet {
     width: 100%;

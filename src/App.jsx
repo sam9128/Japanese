@@ -1462,6 +1462,17 @@ function MockView({
           <button className="primary" type="button" onClick={finish}>
             {unansweredCount ? "提前交卷" : "交卷"}
           </button>
+          <div className="exam-mobile-answer-strip">
+            <ExamAnswerCard
+              questions={questions}
+              answers={answers}
+              mode="practice"
+              onJump={scrollToQuestion}
+              answeredCount={answeredCount}
+              totalQuestions={totalQuestions}
+              unansweredCount={unansweredCount}
+            />
+          </div>
         </div>
         <div className="exam-notice">
           <b>受験上の注意</b>
@@ -2155,6 +2166,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [topbarCollapsed, setTopbarCollapsed] = useState(false);
   const drive = useGoogleDriveSync();
   const now = currentRocPeriod();
   const defaultPeriod = PERIODS.includes(now) ? now : PERIODS[0];
@@ -2228,6 +2240,29 @@ export default function App() {
     );
     return () => cancelAnimationFrame(frame);
   }, [sessionReady, view]);
+  useEffect(() => {
+    let previousY = window.scrollY;
+    const update = () => {
+      const mobile = window.matchMedia("(max-width: 700px)").matches;
+      const currentY = window.scrollY;
+      if (!mobile || menuOpen || currentY < 24) {
+        setTopbarCollapsed(false);
+        previousY = currentY;
+        return;
+      }
+      if (currentY > previousY + 8 && currentY > 90)
+        setTopbarCollapsed(true);
+      else if (currentY < previousY - 8) setTopbarCollapsed(false);
+      previousY = currentY;
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [menuOpen]);
   if (loading || !sessionReady || !settingsReady || !scheduleReady || !store.ready)
     return (
       <div className="loading-screen">
@@ -2244,7 +2279,7 @@ export default function App() {
     );
   const completed = dailyPace.actualTotal;
   return (
-    <div className="app-shell">
+    <div className={`app-shell${topbarCollapsed ? " topbar-collapsed" : ""}`}>
       <Header
         view={view}
         setView={setView}
