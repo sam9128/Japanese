@@ -8,13 +8,23 @@ import {
 
 const FORCE_KEY = "nihongo-stairs-force-drive-sync";
 const DRIVE_AUTH_KEY = "nihongo-stairs-drive-auth";
+const DRIVE_SESSION_KEY = "nihongo-stairs-drive-session";
+const EXPIRY_BUFFER_MS = 30_000;
 
-function readDriveAuth() {
+function readJsonStorage(storage, key) {
   try {
-    return JSON.parse(localStorage.getItem(DRIVE_AUTH_KEY)) || {};
+    return JSON.parse(storage.getItem(key)) || {};
   } catch {
     return {};
   }
+}
+
+function readDriveAuth() {
+  return readJsonStorage(localStorage, DRIVE_AUTH_KEY);
+}
+
+function readDriveSession() {
+  return readJsonStorage(sessionStorage, DRIVE_SESSION_KEY);
 }
 
 function rememberDriveAuth(changes = {}) {
@@ -27,33 +37,65 @@ function rememberDriveAuth(changes = {}) {
   return next;
 }
 
+function rememberDriveSession(grant) {
+  sessionStorage.setItem(
+    DRIVE_SESSION_KEY,
+    JSON.stringify({
+      accessToken: grant.accessToken,
+      expiresAt: grant.expiresAt,
+      updatedAt: new Date().toISOString(),
+    }),
+  );
+}
+
 function forgetDriveAuth() {
   localStorage.removeItem(DRIVE_AUTH_KEY);
+  sessionStorage.removeItem(DRIVE_SESSION_KEY);
+}
+
+function forgetDriveSession() {
+  sessionStorage.removeItem(DRIVE_SESSION_KEY);
+}
+
+function isStoredGrantUsable(saved) {
+  return Boolean(
+    saved?.accessToken && Number(saved.expiresAt) > Date.now() + EXPIRY_BUFFER_MS,
+  );
 }
 
 export function useGoogleDriveSync() {
-  const [connected, setConnected] = useState(false);
-  const [status, setStatus] = useState(
-    googleDriveConfigured ? "idle" : "unconfigured",
-  );
+  const savedAuth = readDriveAuth();
+  const savedSession = readDriveSession();
+  const hasSession = isStoredGrantUsable(savedSession);
+  const [connected, setConnected] = useState(hasSession);
+  const [status, setStatus] = useState(() => {
+    if (!googleDriveConfigured) return "unconfigured";
+    return hasSession ? "synced" : "idle";
+  });
   const [error, setError] = useState("");
   const [lastSyncedAt, setLastSyncedAt] = useState(
-    () => readDriveAuth().lastSyncedAt || "",
+    () => savedAuth.lastSyncedAt || "",
   );
-  const token = useRef(null);
-  const expiresAt = useRef(0);
+  const token = useRef(hasSession ? savedSession.accessToken : null);
+  const expiresAt = useRef(hasSession ? Number(savedSession.expiresAt) : 0);
   const syncing = useRef(false);
   const queued = useRef(false);
   const restoreAttempted = useRef(false);
   const timer = useRef();
 
+  const markNeedsReconnect = useCallback((message) => {
+    token.current = null;
+    expiresAt.current = 0;
+    forgetDriveSession();
+    setConnected(false);
+    setStatus("needs-reconnect");
+    rememberDriveAuth({ enabled: true, lastSyncedAt });
+    setError(message);
+  }, [lastSyncedAt]);
+
   const syncNow = useCallback(async ({ force = false } = {}) => {
-    if (!token.current || expiresAt.current <= Date.now() + 30_000) {
-      token.current = null;
-      setConnected(false);
-      setStatus("needs-reconnect");
-      rememberDriveAuth({ enabled: true, lastSyncedAt });
-      setError("Google 登入已過期，請重新連結。");
+    if (!token.current || expiresAt.current <= Date.now() + EXPIRY_BUFFER_MS) {
+      markNeedsReconnect("Google 登入已過期，請重新連結。");
       return false;
     }
     if (syncing.current) {
@@ -76,14 +118,11 @@ export function useGoogleDriveSync() {
       return true;
     } catch (nextError) {
       if (nextError.status === 401) {
-        token.current = null;
-        setConnected(false);
-        setStatus("needs-reconnect");
-        rememberDriveAuth({ enabled: true, lastSyncedAt });
+        markNeedsReconnect("Google 登入已過期，請重新連結。");
       } else {
         setStatus(navigator.onLine ? "error" : "offline");
+        setError(nextError.message);
       }
-      setError(nextError.message);
       return false;
     } finally {
       syncing.current = false;
@@ -92,7 +131,7 @@ export function useGoogleDriveSync() {
         void syncNow();
       }
     }
-  }, [lastSyncedAt]);
+  }, [markNeedsReconnect]);
 
   const connect = useCallback(async () => {
     setStatus("connecting");
@@ -102,6 +141,7 @@ export function useGoogleDriveSync() {
       token.current = grant.accessToken;
       expiresAt.current = grant.expiresAt;
       setConnected(true);
+      rememberDriveSession(grant);
       rememberDriveAuth({ enabled: true, lastSyncedAt });
       return await syncNow();
     } catch (nextError) {
@@ -125,8 +165,19 @@ export function useGoogleDriveSync() {
     if (!googleDriveConfigured || restoreAttempted.current) return undefined;
     restoreAttempted.current = true;
     const saved = readDriveAuth();
+    const session = readDriveSession();
     if (saved.lastSyncedAt) setLastSyncedAt(saved.lastSyncedAt);
     if (!saved.enabled) return undefined;
+
+    if (isStoredGrantUsable(session)) {
+      token.current = session.accessToken;
+      expiresAt.current = Number(session.expiresAt);
+      setConnected(true);
+      setStatus("synced");
+      void syncNow();
+      return undefined;
+    }
+
     let cancelled = false;
     const restore = async () => {
       setStatus("restoring");
@@ -137,6 +188,7 @@ export function useGoogleDriveSync() {
         token.current = grant.accessToken;
         expiresAt.current = grant.expiresAt;
         setConnected(true);
+        rememberDriveSession(grant);
         rememberDriveAuth({
           enabled: true,
           lastSyncedAt: saved.lastSyncedAt || "",
@@ -144,18 +196,16 @@ export function useGoogleDriveSync() {
         await syncNow();
       } catch {
         if (cancelled) return;
-        token.current = null;
-        expiresAt.current = 0;
-        setConnected(false);
-        setStatus("needs-reconnect");
-        setError("已記住 Google Drive 同步設定，請點一次連結以恢復同步。");
+        markNeedsReconnect(
+          "已記住 Google Drive 同步設定，請點一次連結以恢復同步。",
+        );
       }
     };
     void restore();
     return () => {
       cancelled = true;
     };
-  }, [syncNow]);
+  }, [markNeedsReconnect, syncNow]);
 
   useEffect(() => {
     if (!connected) return undefined;

@@ -1,4 +1,4 @@
-const CACHE = "nihongo-stairs-v31-drive-auth-restore";
+const CACHE = "nihongo-stairs-v32-drive-session-token";
 const PERIODS = [
   "115-07",
   "115-08",

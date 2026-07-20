@@ -52,13 +52,14 @@ export default function DriveSyncPanel({ drive }) {
             >
               立即同步
             </button>
-            <button onClick={drive.disconnect}>中斷本次連線</button>
+            <button onClick={drive.disconnect}>解除這台裝置連結</button>
           </>
         )}
       </div>
       <p className="privacy-note">
         僅要求 Google Drive「應用程式資料」權限；備份存放在隱藏的
-        appDataFolder，網站看不到你的其他檔案，也不保存 Google 密碼或存取權杖。
+        appDataFolder，網站看不到你的其他檔案。為了減少重新登入，短效
+        Google 存取權杖只會暫存在本瀏覽器工作階段，關閉瀏覽器或權杖過期後會要求重新連結。
       </p>
     </article>
   );
