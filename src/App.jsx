@@ -1314,7 +1314,7 @@ function MockView({
             {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
           </div>
           <button className="primary" type="button" onClick={finish}>
-            {unansweredCount ? "提前交卷" : "答案を提出する（交卷）"}
+            {unansweredCount ? "提前交卷" : "交卷"}
           </button>
         </div>
         <div className="exam-notice">

@@ -1599,35 +1599,70 @@ a {
   }
   .exam-control-bar {
     top: 60px;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    padding: 10px;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    gap: 6px;
+    padding: 7px 8px;
+    margin: 0 -4px 8px;
   }
   .exam-control-title {
-    grid-column: 1/-1;
-    order: -1;
+    grid-column: auto;
+    order: 0;
+    min-width: 0;
   }
   .exam-control-title strong {
-    font-size: 15px;
+    display: none;
   }
-  .exam-control-bar button,
-  .exam-control-clock {
-    width: 100%;
+  .exam-control-title span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 11px;
+  }
+  .exam-control-bar button {
+    width: auto;
+    min-width: 56px;
     margin: 0;
+    padding: 7px 8px;
+    font-size: 12px;
+  }
+  .exam-control-clock {
+    min-width: 54px;
+    padding: 7px 8px;
+    margin: 0;
+    font-size: 12px;
   }
   .exam-layout {
     grid-template-columns: 1fr;
+    gap: 8px;
   }
   .exam-answer-card {
-    position: static;
-    padding: 14px;
+    position: sticky;
+    top: 111px;
+    z-index: 12;
+    padding: 8px;
+    margin: 0 -4px 8px;
+    box-shadow: 0 6px 18px rgba(34, 55, 43, 0.06);
+  }
+  .answer-card-head,
+  .answer-card-stats,
+  .answer-card-legend,
+  .mock-exam-section .exam-notice {
+    display: none;
   }
   .answer-card-grid {
-    grid-template-columns: repeat(6, 1fr);
+    display: flex;
+    overflow-x: auto;
     gap: 6px;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
   }
   .answer-card-grid button {
+    flex: 0 0 32px;
     min-height: 32px;
+    font-size: 12px;
+  }
+  .mock-exam-section .page-title {
+    margin-bottom: 8px;
   }
   .empty {
     padding: 40px 12px;
