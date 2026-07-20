@@ -1,4 +1,4 @@
-const CACHE = "nihongo-stairs-v27-exam-status-scroll";
+const CACHE = "nihongo-stairs-v28-exam-current-outline";
 const PERIODS = [
   "115-07",
   "115-08",

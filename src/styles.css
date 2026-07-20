@@ -1077,9 +1077,12 @@ a {
   box-shadow: 0 4px 12px rgba(34, 55, 43, 0.1);
 }
 .answer-card-grid button.current {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 3px rgba(199, 154, 76, 0.18);
+  background: #fff !important;
+  border-color: var(--gold);
+  color: var(--green);
+  outline: 1px solid var(--gold);
+  outline-offset: -2px;
+  box-shadow: none;
 }
 .answer-card-legend {
   display: flex;
